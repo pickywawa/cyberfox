@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
   nodeSchema,
+  migrateProject,
+  validateTree,
   projectInput,
   settingsSchema,
   type Project,
@@ -17,6 +19,10 @@ const projectSchema = z.object({
   platforms: projectInput.shape.platforms,
   tab: z.enum(['creation', 'execution']),
   nodes: z.array(nodeSchema),
+  selectedNodeId: z.string().nullable().default(null),
+  tags: z.array(z.string()).default([]),
+  revision: z.number().int().default(0),
+  deviceIds: z.object({ android: z.string().optional(), ios: z.string().optional() }).default({}),
   messages: z.array(
     z.object({
       id: z.string(),
@@ -36,7 +42,7 @@ export class Store {
   ) {}
   async load() {
     await fs.mkdir(this.configDirectory, { recursive: true });
-    const defaults: Settings = {
+    const defaults: Settings = settingsSchema.parse({
       theme: 'system',
       language: 'fr',
       projectsDirectory: path.join(this.documents, 'Cyberfox', 'Projects'),
@@ -45,7 +51,7 @@ export class Store {
       copilotModel: '',
       wdaDeviceId: '',
       wdaUrl: 'http://127.0.0.1:8100',
-    };
+    });
     try {
       const raw = JSON.parse(
         await fs.readFile(path.join(this.configDirectory, 'workspace.json'), 'utf8'),
@@ -59,8 +65,10 @@ export class Store {
         try {
           this.state.projects.push(
             projectSchema.parse(
-              JSON.parse(
-                await fs.readFile(path.join(entry.directory, 'cyberfox.project.json'), 'utf8'),
+              migrateProject(
+                JSON.parse(
+                  await fs.readFile(path.join(entry.directory, 'cyberfox.project.json'), 'utf8'),
+                ),
               ),
             ),
           );
@@ -132,6 +140,10 @@ export class Store {
         id: randomUUID(),
         directory,
         tab: 'creation',
+        tags: [],
+        revision: 0,
+        selectedNodeId: null,
+        deviceIds: {},
         nodes: [],
         messages: [],
         createdAt: new Date().toISOString(),
@@ -152,6 +164,40 @@ export class Store {
       return project;
     });
   }
+  async latestReport(projectId: string): Promise<import('../shared/model.js').RunReport | null> {
+    const directory = path.join(this.get(projectId).directory, 'reports');
+    let files: string[];
+    try {
+      files = (await fs.readdir(directory)).filter((f) => /^[a-zA-Z0-9-]+\.json$/.test(f));
+    } catch {
+      return null;
+    }
+    const reports = await Promise.all(
+      files.map(async (file) => {
+        try {
+          return JSON.parse(
+            await fs.readFile(path.join(directory, file), 'utf8'),
+          ) as import('../shared/model.js').RunReport;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    return (
+      reports
+        .filter(
+          (r): r is import('../shared/model.js').RunReport =>
+            !!r && r.projectId === projectId && Array.isArray(r.entries),
+        )
+        .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0] ?? null
+    );
+  }
+  async saveReport(report: import('../shared/model.js').RunReport) {
+    const project = this.get(report.projectId);
+    const directory = path.join(project.directory, 'reports');
+    await fs.mkdir(directory, { recursive: true });
+    await this.atomic(path.join(directory, report.id + '.json'), report);
+  }
   select(id: string) {
     return this.transaction(async () => {
       this.get(id);
@@ -170,10 +216,30 @@ export class Store {
     tab?: Project['tab'];
     nodes?: Project['nodes'];
     messages?: Project['messages'];
+    tags?: string[];
+    deviceIds?: Project['deviceIds'];
+    expectedRevision?: number;
+    selectedNodeId?: string | null;
   }) {
     return this.transaction(async () => {
       const current = this.get(input.id);
-      const next = projectSchema.parse({ ...current, ...input });
+      if (input.expectedRevision !== undefined && input.expectedRevision !== current.revision)
+        throw new Error('Le projet a changé. Rechargez la proposition.');
+      const next = projectSchema.parse({
+        ...current,
+        ...input,
+        deviceIds: { ...current.deviceIds, ...input.deviceIds },
+        revision: current.revision + (input.nodes || input.tags ? 1 : 0),
+      });
+      validateTree(next.nodes);
+      next.tags = [
+        ...new Set([
+          ...next.tags,
+          ...next.nodes.flatMap(function all(n): string[] {
+            return [...n.tags, ...n.children.flatMap(all)];
+          }),
+        ]),
+      ];
       const ids = new Set<string>();
       const check = (nodes: Project['nodes'], depth = 0) => {
         if (depth > 20) throw new Error('Arbre trop profond');

@@ -28,10 +28,11 @@ try {
   await page.getByLabel('Nom du projet').fill('Smoke mobile');
   await page.getByRole('button', { name: 'Créer le projet', exact: true }).click();
   await expect(page.getByLabel('PROJET COURANT')).toHaveValue(/.+/);
-  await page.getByRole('button', { name: 'Ajouter un élément', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Ajouter un scénario', exact: true }).first().click();
   await page.getByLabel('Nom', { exact: true }).fill('Profil visible');
-  await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
+  await page.getByLabel('Description facultative').click();
   await page.getByRole('tab', { name: 'Exécution' }).click();
+  await expect(page.getByRole('heading', { name: 'Prêt à vérifier' })).toBeVisible();
   const saved = JSON.parse(
     await readFile(
       path.join(temporary, 'projects', 'Smoke mobile', 'cyberfox.project.json'),

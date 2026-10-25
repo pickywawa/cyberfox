@@ -4,33 +4,45 @@ import { z } from 'zod';
 import { Store } from './store.js';
 import { Devices } from './devices.js';
 import { Ai } from './ai.js';
-import { nodeSchema, projectInput, settingsSchema } from '../shared/model.js';
-const userData = process.env.CYBERFOX_USER_DATA;
-if (userData) app.setPath('userData', userData);
+import { Automation } from './automation.js';
+import { Runner } from './runner.js';
+import {
+  nodeSchema,
+  projectInput,
+  settingsSchema,
+  variantSchema,
+  type LiveEvent,
+} from '../shared/model.js';
+if (process.env.CYBERFOX_USER_DATA) app.setPath('userData', process.env.CYBERFOX_USER_DATA);
 let window: BrowserWindow | undefined;
+let detached: BrowserWindow | undefined;
 let ai: Ai;
+let automation: Automation;
+let runner: Runner;
+let store: Store;
+const allowed = new Set<BrowserWindow>();
 const isDev = process.env.CYBERFOX_DEV === '1';
+let quitting = false;
+function emit(event: LiveEvent) {
+  for (const win of allowed) if (!win.isDestroyed()) win.webContents.send('live:event', event);
+}
 function register<T>(channel: string, schema: z.ZodType<T>, handler: (arg: T) => unknown) {
   ipcMain.handle(channel, (event, arg) => {
-    if (
-      !window ||
-      event.sender !== window.webContents ||
-      event.senderFrame !== window.webContents.mainFrame
-    )
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    if (!owner || !allowed.has(owner) || event.senderFrame !== owner.webContents.mainFrame)
       throw new Error('IPC interdit');
     return handler(schema.parse(arg));
   });
 }
-const provider = z.enum(['codex', 'copilot']);
-async function createWindow() {
-  window = new BrowserWindow({
-    width: 1510,
+async function createWindow(devicesOnly = false) {
+  const win = new BrowserWindow({
+    width: devicesOnly ? 900 : 1510,
     height: 960,
-    minWidth: 1080,
-    minHeight: 700,
-    title: 'Cyberfox',
+    minWidth: devicesOnly ? 360 : 1000,
+    minHeight: 600,
+    title: devicesOnly ? 'Cyberfox · Appareils' : 'Cyberfox',
     backgroundColor: '#16171d',
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: devicesOnly ? 'default' : 'hiddenInset',
     trafficLightPosition: { x: 16, y: 17 },
     webPreferences: {
       preload: path.join(import.meta.dirname, 'preload.cjs'),
@@ -39,26 +51,52 @@ async function createWindow() {
       sandbox: true,
     },
   });
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  window.webContents.on('will-navigate', (event, url) => {
-    if (url !== window?.webContents.getURL()) event.preventDefault();
+  allowed.add(win);
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', (e, url) => {
+    if (url !== win.webContents.getURL()) e.preventDefault();
   });
-  if (isDev) await window.loadURL('http://127.0.0.1:5173');
-  else await window.loadFile(path.join(import.meta.dirname, '../../dist/index.html'));
+  win.on('closed', () => {
+    allowed.delete(win);
+    if (devicesOnly) {
+      detached = undefined;
+      if (!quitting)
+        void store
+          .saveSettings({ ...store.state.settings, devicesDetached: false })
+          .then(() => emit({ type: 'workspace' }));
+    } else window = undefined;
+  });
+  if (devicesOnly) detached = win;
+  else window = win;
+  if (isDev) await win.loadURL('http://127.0.0.1:5173' + (devicesOnly ? '?devices=1' : ''));
+  else
+    await win.loadFile(path.join(import.meta.dirname, '../../dist/index.html'), {
+      query: devicesOnly ? { devices: '1' } : {},
+    });
+  return win;
 }
 app
   .whenReady()
   .then(async () => {
-    const store = new Store(app.getPath('userData'), app.getPath('documents'));
+    store = new Store(app.getPath('userData'), app.getPath('documents'));
     await store.load();
     const devices = new Devices(() => ({
       url: store.state.settings.wdaUrl,
       udid: store.state.settings.wdaDeviceId,
     }));
+    automation = new Automation(
+      (id) => devices.known.get(id),
+      () => store.state.settings,
+      emit,
+    );
+    devices.automationScreenshot = (id) => automation.screenshot(id);
     ai = new Ai(
       store,
       devices,
-      (event) => window?.webContents.send('ai:login-progress', event),
+      (event) => {
+        for (const win of allowed)
+          if (!win.isDestroyed()) win.webContents.send('ai:login-progress', event);
+      },
       async (url) => {
         const parsed = new URL(url);
         if (
@@ -68,19 +106,37 @@ app
           throw new Error('URL OAuth non autorisée');
         await shell.openExternal(url);
       },
+      automation,
+      emit,
     );
+    runner = new Runner(store, automation, devices, emit, (entry, report) =>
+      ai.analyze(entry, report),
+    );
+    const mutation = async <T>(promise: Promise<T>) => {
+      const result = await promise;
+      emit({ type: 'workspace' });
+      return result;
+    };
     register('workspace:load', z.undefined(), () => store.state);
-    register('settings:save', settingsSchema, (s) => store.saveSettings(s));
-    register('project:create', projectInput, (p) => store.create(p));
-    register('project:select', z.string(), (id) => store.select(id));
+    register('settings:save', settingsSchema, (s) =>
+      mutation(store.saveSettings({ ...s, devicesDetached: store.state.settings.devicesDetached })),
+    );
+    register('project:create', projectInput, (p) => mutation(store.create(p)));
+    register('project:select', z.string(), (id) => mutation(store.select(id)));
     register(
       'project:update',
       z.object({
         id: z.string(),
         tab: z.enum(['creation', 'execution']).optional(),
         nodes: z.array(nodeSchema).max(1000).optional(),
+        tags: z.array(z.string().min(1).max(60)).max(500).optional(),
+        deviceIds: z
+          .object({ android: z.string().optional(), ios: z.string().optional() })
+          .optional(),
+        selectedNodeId: z.string().nullable().optional(),
+        expectedRevision: z.number().int().optional(),
       }),
-      (p) => store.update(p),
+      (p) => mutation(store.update(p)),
     );
     register('directory:choose', z.undefined(), async () => {
       const result = await dialog.showOpenDialog(window!, {
@@ -89,6 +145,7 @@ app
       return result.canceled ? null : result.filePaths[0];
     });
     register('project:reveal', z.string(), (id) => shell.openPath(store.get(id).directory));
+    const provider = z.enum(['codex', 'copilot']);
     register('ai:status', provider, (p) => ai.status(p));
     register('ai:login', provider, (p) => ai.login(p));
     register(
@@ -101,25 +158,73 @@ app
       }),
       (p) => ai.ask(p),
     );
+    register('ai:cancel', z.string(), (id) => ai.cancel(id));
     register('devices:scan', z.undefined(), () => devices.scan());
-    register('devices:screenshot', z.string(), (id) => devices.screenshot(id));
+    register('devices:screenshot', z.string(), async (id) => {
+      try {
+        return await devices.screenshot(id);
+      } catch (error) {
+        emit({ type: 'device', deviceId: id, ready: false });
+        throw error;
+      }
+    });
+    register('devices:inspect', z.string(), async (id) => {
+      try {
+        return await automation.inspect(id);
+      } catch (error) {
+        if (!String(error).includes('occupé')) emit({ type: 'device', deviceId: id, ready: false });
+        throw error;
+      }
+    });
+    register(
+      'devices:perform',
+      z.object({
+        deviceId: z.string(),
+        variant: variantSchema,
+        kind: z.enum(['scenario', 'action', 'navigation', 'test']),
+      }),
+      (p) => automation.perform(p.deviceId, p.variant, p.kind),
+    );
+    register(
+      'run:start',
+      z.object({
+        projectId: z.string(),
+        nodeId: z.string().optional(),
+        deviceIds: z.array(z.string()).max(2),
+      }),
+      (p) => runner.start(p),
+    );
+    register('run:cancel', z.undefined(), () => runner.cancel());
+    register('run:current', z.string(), (id) => runner.current(id));
+    register('run:analyze', z.object({ runId: z.string(), entryId: z.string() }), (p) =>
+      runner.analyze(p),
+    );
+    register('devices:detach', z.boolean(), async (value) => {
+      await store.saveSettings({ ...store.state.settings, devicesDetached: value });
+      if (value) {
+        if (detached) detached.focus();
+        else await createWindow(true);
+      } else detached?.close();
+      emit({ type: 'workspace' });
+    });
     await createWindow();
+    if (store.state.settings.devicesDetached) await createWindow(true);
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) void createWindow();
+      if (!window) void createWindow();
     });
   })
-  .catch((error) => {
-    dialog.showErrorBox('Cyberfox', String(error));
+  .catch((e) => {
+    dialog.showErrorBox('Cyberfox', String(e));
     app.quit();
   });
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
-let closing = false;
-app.on('before-quit', (event) => {
-  if (ai && !closing) {
-    event.preventDefault();
-    closing = true;
-    void ai.stop().finally(() => app.quit());
+app.on('before-quit', (e) => {
+  if (!quitting) {
+    e.preventDefault();
+    quitting = true;
+    runner?.cancel();
+    void Promise.allSettled([ai?.stop(), automation?.stop()]).finally(() => app.quit());
   }
 });

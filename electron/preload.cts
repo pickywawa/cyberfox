@@ -18,6 +18,22 @@ const bridge: Bridge = {
   },
   aiAsk: (input) => ipcRenderer.invoke('ai:ask', input),
   devicesScan: () => ipcRenderer.invoke('devices:scan'),
+  aiCancel: (id) => ipcRenderer.invoke('ai:cancel', id),
+  inspect: (id) => ipcRenderer.invoke('devices:inspect', id),
+  perform: (input) => ipcRenderer.invoke('devices:perform', input),
+  runStart: (input) => ipcRenderer.invoke('run:start', input),
+  runCancel: () => ipcRenderer.invoke('run:cancel'),
+  runCurrent: (id) => ipcRenderer.invoke('run:current', id),
+  analyze: (input) => ipcRenderer.invoke('run:analyze', input),
+  detachDevices: (value) => ipcRenderer.invoke('devices:detach', value),
+  onEvent: (callback) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      value: import('../shared/model.js').LiveEvent,
+    ) => callback(value);
+    ipcRenderer.on('live:event', listener);
+    return () => ipcRenderer.removeListener('live:event', listener);
+  },
   screenshot: (id) => ipcRenderer.invoke('devices:screenshot', id),
 };
 contextBridge.exposeInMainWorld('cyberfox', bridge);

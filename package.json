@@ -1,7 +1,7 @@
 {
   "name": "cyberfox",
   "productName": "Cyberfox",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Mobile QA workspace with AI-assisted scenarios",
   "type": "module",
@@ -14,13 +14,19 @@
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "playwright test",
     "dist": "npm run build && electron-builder --publish never",
-    "test:electron": "npm run build && node tests/electron-smoke.mjs",
-    "format": "prettier --write src electron shared tests *.json *.ts index.html"
+    "test:electron": "npm run build && node tests/electron-smoke.mjs && node tests/window-smoke.mjs",
+    "format": "prettier --write src electron shared tests *.json *.ts index.html",
+    "test:mobile": "npm run build && node tests/mobile-live.mjs",
+    "test:ai-live": "npm run build && node tests/ai-live.mjs"
   },
   "dependencies": {
     "@github/copilot": "^1.0.103",
     "@github/copilot-sdk": "^1.0.26",
     "@openai/codex-sdk": "^0.164.0",
+    "@xmldom/xmldom": "^0.9.12",
+    "appium": "^3.8.0",
+    "appium-uiautomator2-driver": "^8.7.0",
+    "appium-xcuitest-driver": "^12.20.0",
     "lucide-react": "^1.61.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -48,7 +54,9 @@
     "asarUnpack": [
       "node_modules/@openai/**",
       "node_modules/@github/**",
-      "node_modules/@github/copilot*/**"
+      "node_modules/@github/copilot*/**",
+      "node_modules/appium*/**",
+      "node_modules/@appium/**"
     ],
     "files": [
       "dist/**",

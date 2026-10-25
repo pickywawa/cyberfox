@@ -18,13 +18,13 @@ test('projects persist independently, restore selected tab, reject overwrites an
       nodes: [
         {
           id: 'nav',
-          kind: 'navigation',
+          kind: 'scenario',
           name: 'Connexion',
           description: 'Ouvrir la connexion',
           children: [
             {
               id: 'check',
-              kind: 'assertion',
+              kind: 'test',
               name: 'Profil',
               description: 'Nom visible',
               children: [],

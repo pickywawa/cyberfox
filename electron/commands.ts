@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -9,8 +9,17 @@ const extra = [
   '/opt/homebrew/bin',
   '/usr/local/bin',
 ];
+let javaHome = process.env.JAVA_HOME;
+try {
+  if (!javaHome && process.platform === 'darwin')
+    javaHome = execFileSync('/usr/libexec/java_home', { encoding: 'utf8' }).trim();
+} catch {}
 export const commandEnv = {
   ...process.env,
+  JAVA_HOME: javaHome,
+  ANDROID_HOME:
+    process.env.ANDROID_HOME ??
+    path.join(os.homedir(), process.platform === 'darwin' ? 'Library/Android/sdk' : 'Android/Sdk'),
   PATH: [process.env.PATH, ...extra].filter(Boolean).join(path.delimiter),
 };
 export function command(

@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { command } from './commands.js';
 import type { Device, DeviceScan } from '../shared/model.js';
 export function parseAdb(text: string): Device[] {
@@ -66,29 +69,32 @@ export class Devices {
           }
         })(),
         (async () => {
+          const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'cyberfox-devices-'));
           try {
-            const ids = (await command('idevice_id', ['-l']))
-              .toString()
-              .trim()
-              .split('\n')
-              .filter(Boolean);
-            for (const id of ids) {
-              const name = await command('idevicename', ['-u', id])
-                .then((b) => b.toString().trim())
-                .catch(() => `iPhone ${id.slice(0, 8)}`);
+            const file = path.join(temp, 'devices.json');
+            await command('xcrun', ['devicectl', 'list', 'devices', '--json-output', file]);
+            const data = JSON.parse(await fs.readFile(file, 'utf8'));
+            for (const d of data.result?.devices ?? []) {
+              if (d.hardwareProperties?.reality !== 'physical') continue;
+              const udid = d.hardwareProperties.udid;
+              if (!udid) continue;
               devices.push({
-                id: `ios:${id}`,
-                name,
+                id: 'ios:' + udid,
+                name: d.deviceProperties.name,
                 platform: 'ios',
                 kind: 'usb',
-                status: 'ready',
-                detail: `${id} · USB · WebDriverAgent requis pour le miroir`,
+                status:
+                  d.connectionProperties?.pairingState === 'paired' &&
+                  d.deviceProperties?.bootState === 'booted'
+                    ? 'ready'
+                    : 'offline',
+                detail: udid + ' · ' + d.connectionProperties?.transportType,
               });
             }
           } catch {
-            diagnostics.push(
-              'iPhone USB : installer libimobiledevice ; préparer WebDriverAgent pour le miroir.',
-            );
+            diagnostics.push('iPhone USB : vérifier Xcode, la confiance et le mode développeur.');
+          } finally {
+            await fs.rm(temp, { recursive: true, force: true });
           }
         })(),
       );
@@ -96,9 +102,12 @@ export class Devices {
     this.known = new Map(devices.map((d) => [d.id, d]));
     return { devices, diagnostics };
   }
+  automationScreenshot?: (id: string) => Promise<string | undefined>;
   async screenshot(id: string): Promise<string> {
     const d = this.known.get(id);
     if (!d || d.status !== 'ready') throw new Error('Appareil non connecté');
+    const automated = await this.automationScreenshot?.(id);
+    if (automated) return automated;
     let buffer: Buffer;
     if (d.platform === 'android')
       buffer = await command('adb', ['-s', id.slice(8), 'exec-out', 'screencap', '-p'], {
