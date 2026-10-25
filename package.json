@@ -1,7 +1,7 @@
 {
   "name": "cyberfox",
   "productName": "Cyberfox",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Mobile QA workspace with AI-assisted scenarios",
   "type": "module",
@@ -18,7 +18,9 @@
     "format": "prettier --write src electron shared tests *.json *.ts index.html",
     "test:mobile": "npm run build && node tests/mobile-live.mjs",
     "test:ai-live": "npm run build && node tests/ai-live.mjs",
-    "test:updates": "npm run build && node tests/updater-proxy.mjs"
+    "test:updates": "npm run build && node tests/updater-proxy.mjs",
+    "icons": "node scripts/generate-icons.mjs",
+    "test:package:mac": "node scripts/verify-macos-package.mjs"
   },
   "dependencies": {
     "@github/copilot": "^1.0.103",
@@ -28,9 +30,6 @@
     "appium": "^3.8.0",
     "appium-uiautomator2-driver": "^8.7.0",
     "appium-xcuitest-driver": "^12.20.0",
-    "lucide-react": "^1.61.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -47,7 +46,11 @@
     "tsx": "^4.23.15",
     "typescript": "~5.9.0",
     "vite": "^8.3.5",
-    "wait-on": "^9.5.1"
+    "wait-on": "^9.5.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "lucide-react": "^1.61.0",
+    "sharp": "^0.35.4"
   },
   "build": {
     "appId": "com.pickywawa.cyberfox",
@@ -62,14 +65,16 @@
     "files": [
       "dist/**",
       "dist-electron/**",
-      "package.json"
+      "package.json",
+      "!node_modules/@github/copilot-sdk-*/**/*"
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
         "dmg"
       ],
-      "identity": null
+      "identity": "-",
+      "icon": "build/icon.icns"
     },
     "win": {
       "target": [
@@ -92,7 +97,19 @@
         "owner": "pickywawa",
         "repo": "cyberfox"
       }
-    ]
+    ],
+    "icon": "build/icon.png",
+    "electronLanguages": [
+      "en",
+      "fr"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
+    ],
+    "afterSign": "scripts/verify-macos-package.mjs"
   },
   "overrides": {
     "zod": "$zod"

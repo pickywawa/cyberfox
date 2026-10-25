@@ -4,7 +4,7 @@ Atelier QA mobile Electron, React et TypeScript : exploration par composants, sc
 
 ## Installation et mises à jour
 
-Télécharger le DMG **macOS Apple Silicon (arm64)** depuis les [releases GitHub](https://github.com/pickywawa/cyberfox/releases/latest), puis glisser Cyberfox dans Applications. Cette distribution n’est pas signée ni notariée ; macOS peut demander une autorisation d’ouverture dans Réglages Système → Confidentialité et sécurité. Les autres architectures n’ont pas encore d’installateur publié.
+Télécharger le DMG **macOS Apple Silicon (arm64)** depuis les [releases GitHub](https://github.com/pickywawa/cyberfox/releases/latest), puis glisser Cyberfox dans Applications. La version 0.3.1 utilise une signature locale ad hoc valide, mais n’a pas de signature Developer ID ni de notarisation Apple. Gatekeeper ne l’accepte donc pas automatiquement. Après une première tentative d’ouverture, une autorisation manuelle peut être proposée dans Réglages Système → Confidentialité et sécurité → Ouvrir quand même. Une distribution reconnue sans cette intervention exige un certificat Developer ID Application et une notarisation Apple. Les autres architectures n’ont pas encore d’installateur publié.
 
 À partir de la version 0.3.0, Cyberfox vérifie les releases stables au démarrage puis toutes les quatre heures. Une nouvelle version affiche le bouton **Nouveau**. Paramètres → **Mises à jour** permet de vérifier manuellement, lire les notes, télécharger avec une barre de progression et activer le téléchargement automatique. Les réglages utilisent le bouton Enregistrer habituel.
 
@@ -13,6 +13,14 @@ Le téléchargement ne ferme jamais l’application. **Installer la mise à jour
 La pile réseau Chromium utilise le proxy système et PAC, y compris derrière un VPN, avec rechargement du proxy après une erreur de connexion. Si le VPN ou le pare-feu interdit GitHub, il doit autoriser GitHub et ses hôtes de téléchargement. Les vérifications TLS restent actives. L’installateur est contrôlé par taille et SHA-256 fourni par GitHub avant installation ; aucun fichier incompatible ou sans empreinte n’est exécuté.
 
 Pour produire la prochaine release : incrémenter la version, lancer `npm ci`, `npm run dist -- --mac dmg --arm64`, puis publier le tag et le DMG sur ce dépôt public. Conserver le nom généré `Cyberfox-<version>-mac-arm64.dmg` : le moteur choisit l’installateur selon l’OS et l’architecture. Les préversions sont exclues des mises à jour automatiques.
+
+### Icône, taille et signature du paquet macOS
+
+L’icône source est `public/cyberfox.svg` ; `npm run icons` régénère `build/icon.png` et `build/icon.icns`. Le paquet utilise cette icône pour Finder et le Dock, y compris au lancement de la version de développement.
+
+Les bibliothèques React et les icônes Lucide sont uniquement des dépendances de développement : Vite les compile dans le frontend. Copilot partage un seul exécutable entre authentification et transport SDK, sans embarquer le second runtime natif optionnel du SDK. Codex et Appium restent inclus et les fonctions QA sont conservées. Le DMG passe de 494,7 à 420,8 Mo ; les fichiers de l’application passent de 1 115,1 à 918,7 Mo.
+
+`mac.identity` vaut `-` pour activer une signature ad hoc, et non `null` qui désactive la signature et laissait en 0.3.0 un sceau Electron invalide. Le hook `afterSign` vérifie la signature profonde et stricte, l’icône et l’absence du second runtime Copilot avant de créer le DMG. `npm run test:package:mac` répète ces contrôles sur le paquet construit. Ce contrôle d’intégrité ne remplace pas l’approbation Gatekeeper : celle-ci exige la signature Developer ID et la notarisation.
 
 ## Développement
 
@@ -106,4 +114,4 @@ Ces deux scripts sont dédiés à l’écran MFA de Pro SNP actuellement affich�
 
 Validation réelle effectuée pendant le développement : connexion Android jusqu’au choix de réception du code MFA, inspection de 37 composants, assertion sur le titre MFA réussie, génération Codex d’un scénario et d’une assertion sans insertion automatique. L’essai iPhone est bloqué par Xcode (« No Accounts » et profil WDA absent). Le fonctionnement simultané Android+iOS est couvert avec des pilotes de test ; il reste à valider sur les deux appareils physiques une fois la signature iOS préparée.
 
-Les dépendances Appium apportent des avis `npm audit`, dont certains concernent des dépendances empaquetées dans les pilotes et ne sont pas corrigés par `npm audit fix`. Le serveur reste limité à l’interface locale. Les installateurs signés et la validation du packaging Appium restent à préparer avant distribution.
+Les dépendances Appium apportent des avis `npm audit`, dont certains concernent des dépendances empaquetées dans les pilotes et ne sont pas corrigés par `npm audit fix`. Le serveur reste limité à l’interface locale. La signature Developer ID, la notarisation Apple et la validation complète du packaging Appium restent à préparer pour une distribution reconnue automatiquement par macOS.

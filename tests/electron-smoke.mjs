@@ -58,7 +58,7 @@ try {
       codex: codex.authenticated,
       copilot: copilot.authenticated,
       copilotModels: copilot.models.length,
-      copilotError: copilot.error,
+      copilotError: copilot.authenticated ? undefined : copilot.message,
       devices: devices.devices.length,
     };
   });

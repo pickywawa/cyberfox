@@ -1,3 +1,27 @@
+# Cyberfox 0.3.1
+
+## Icône et paquet macOS
+
+- Icône Cyberfox dans Finder, le Dock, les fenêtres et le navigateur. Sources SVG et génération reproductible PNG/ICNS.
+- Signature macOS ad hoc rétablie : la version 0.3.0 désactivait la signature et conservait un sceau Electron invalide, pouvant provoquer le message « application endommagée ».
+- Vérification profonde et stricte de la signature et des icônes avant construction du DMG.
+
+**La signature reste locale, sans Developer ID ni notarisation Apple. Gatekeeper ne reconnaît donc pas automatiquement cette version. Après une première tentative d’ouverture, macOS peut proposer Réglages Système → Confidentialité et sécurité → Ouvrir quand même. Une ouverture sans cette intervention nécessite un certificat Developer ID Application et une notarisation Apple.**
+
+## Taille réduite
+
+- DMG : **494,7 → 420,8 Mo (−15 %)**.
+- Fichiers de l’application : **1 115,1 → 918,7 Mo (−18 %)**, hors différence de comptage de Finder et du système de fichiers.
+- Un seul moteur Copilot sert à la connexion et au SDK ; le second runtime natif est exclu du paquet.
+- React, React DOM et Lucide sont compilés dans le frontend et ne sont plus embarqués une seconde fois comme dépendances backend.
+- Electron, Codex et Appium restent inclus.
+
+## Vérifications
+
+Build, 18 tests unitaires/protocole, parcours navigateur, lancement de l’application empaquetée, persistance et signature macOS. Le transport SDK Copilot communique avec le CLI unique et l’authentification a été vérifiée ; les derniers essais de catalogue et de réponse IA ont rencontré des délais réseau. Le contrôle Gatekeeper reste rejeté sans Developer ID/notarisation, indépendamment du contrôle d’intégrité de la signature qui réussit.
+
+---
+
 # Cyberfox 0.3.0
 
 ## Mises à jour depuis GitHub

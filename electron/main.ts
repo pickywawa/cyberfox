@@ -23,6 +23,9 @@ let runner: Runner;
 let store: Store;
 const allowed = new Set<BrowserWindow>();
 const isDev = process.env.CYBERFOX_DEV === '1';
+const appIcon = app.isPackaged
+  ? path.join(process.resourcesPath, 'icon.png')
+  : path.join(app.getAppPath(), 'build/icon.png');
 let quitting = false;
 function emit(event: LiveEvent) {
   for (const win of allowed) if (!win.isDestroyed()) win.webContents.send('live:event', event);
@@ -42,6 +45,7 @@ async function createWindow(devicesOnly = false) {
     minWidth: devicesOnly ? 360 : 1000,
     minHeight: 600,
     title: devicesOnly ? 'Cyberfox · Appareils' : 'Cyberfox',
+    icon: appIcon,
     backgroundColor: '#16171d',
     titleBarStyle: devicesOnly ? 'default' : 'hiddenInset',
     trafficLightPosition: { x: 16, y: 17 },
@@ -79,6 +83,7 @@ async function createWindow(devicesOnly = false) {
 app
   .whenReady()
   .then(async () => {
+    if (process.platform === 'darwin') app.dock?.setIcon(appIcon);
     store = new Store(app.getPath('userData'), app.getPath('documents'));
     await store.load();
     const devices = new Devices(() => ({
