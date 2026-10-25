@@ -265,6 +265,9 @@ export class Runner {
     this.publish(report);
     await this.persistence;
   }
+  isRunning() {
+    return !!this.active;
+  }
   cancel() {
     this.active?.abort.abort();
   }

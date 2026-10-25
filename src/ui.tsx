@@ -1,3 +1,4 @@
+import { UpdatePanel } from './UpdatePanel';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   ArrowRight,
@@ -262,6 +263,7 @@ export function SettingsModal({
     ['ai', L('Intégration IA', 'AI integration'), Bot],
     ['devices', L('Appareils', 'Devices'), Smartphone],
     ['execution', L('Exécution', 'Execution'), Play],
+    ['updates', L('Mises à jour', 'Updates'), RefreshCw],
   ] as const;
   return (
     <Modal wide title={L('Paramètres', 'Settings')} onClose={onClose}>
@@ -275,6 +277,39 @@ export function SettingsModal({
           ))}
         </nav>
         <div className="settings-content">
+          {tab === 'updates' && (
+            <>
+              <UpdatePanel L={L} />
+              <label className="toggle-line">
+                <input
+                  type="checkbox"
+                  checked={draft.checkUpdatesOnStart}
+                  onChange={(e) => update('checkUpdatesOnStart', e.target.checked)}
+                />
+                {L(
+                  'Rechercher automatiquement au démarrage et toutes les 4 heures',
+                  'Check automatically on startup and every 4 hours',
+                )}
+              </label>
+              <label className="toggle-line">
+                <input
+                  type="checkbox"
+                  checked={draft.autoDownloadUpdates}
+                  onChange={(e) => update('autoDownloadUpdates', e.target.checked)}
+                />
+                {L(
+                  'Télécharger automatiquement les nouvelles versions',
+                  'Automatically download new versions',
+                )}
+              </label>
+              <p className="note">
+                {L(
+                  'L’installation demande toujours votre accord avant d’ouvrir le DMG et fermer Cyberfox.',
+                  'Installation always asks before opening the installer and closing Cyberfox.',
+                )}
+              </p>
+            </>
+          )}
           {tab === 'appearance' && (
             <>
               <span className="eyebrow">

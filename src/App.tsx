@@ -1,3 +1,4 @@
+import { useUpdateStatus, UpdateProgress } from './UpdatePanel';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import {
   ArrowRight,
@@ -44,6 +45,7 @@ import {
 } from '../shared/model';
 const detachedWindow = new URLSearchParams(location.search).get('devices') === '1';
 export function App() {
+  const updateStatus = useUpdateStatus();
   const [state, setState] = useState<Workspace>();
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -427,7 +429,7 @@ export function App() {
           <div className="brand">
             <Fox small />
             <b>cyberfox</b>
-            <span className="version">0.2</span>
+            <span className="version">{__APP_VERSION__}</span>
           </div>
           <div
             className="global-tabs"
@@ -451,6 +453,17 @@ export function App() {
             {project?.name ?? L('Atelier QA mobile', 'Mobile QA workspace')}
           </div>
           <div className="title-actions">
+            {['available', 'ready', 'downloading'].includes(updateStatus.state) && (
+              <button className="new-update-button" onClick={() => setSettingsTab('updates')}>
+                {updateStatus.state === 'downloading'
+                  ? `${updateStatus.percent}%`
+                  : updateStatus.state === 'ready'
+                    ? L('Installer', 'Install')
+                    : L('Nouveau', 'New')}{' '}
+                {updateStatus.version}
+              </button>
+            )}
+
             <span className="badge">
               <span className={'dot ' + (ready ? 'green' : '')} />
               {ready
@@ -468,6 +481,11 @@ export function App() {
             </button>
           </div>
         </header>
+      )}
+      {updateStatus.state === 'downloading' && !detachedWindow && (
+        <div className="update-download-banner">
+          <UpdateProgress status={updateStatus} L={L} />
+        </div>
       )}
       {!isDesktop && (
         <div className="preview-banner">

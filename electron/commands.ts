@@ -79,3 +79,17 @@ export function copilotBinary(): string {
     .replace('app.asar/', 'app.asar.unpacked/');
   return existsSync(candidate) ? candidate : `copilot${suffix}`;
 }
+export function copilotRuntime(): string | undefined {
+  const platform =
+    process.platform === 'linux' && !(process.report.getReport() as any).header.glibcVersionRuntime
+      ? 'linuxmusl'
+      : process.platform;
+  const suffix = process.platform === 'win32' ? '.exe' : '';
+  const candidate = path
+    .resolve(
+      import.meta.dirname,
+      `../../node_modules/@github/copilot-sdk-${platform}-${process.arch}/prebuilds/${platform}-${process.arch}/copilot-runtime${suffix}`,
+    )
+    .replace('app.asar/', 'app.asar.unpacked/');
+  return existsSync(candidate) ? candidate : undefined;
+}

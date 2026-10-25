@@ -1,7 +1,7 @@
 {
   "name": "cyberfox",
   "productName": "Cyberfox",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Mobile QA workspace with AI-assisted scenarios",
   "type": "module",
@@ -17,7 +17,8 @@
     "test:electron": "npm run build && node tests/electron-smoke.mjs && node tests/window-smoke.mjs",
     "format": "prettier --write src electron shared tests *.json *.ts index.html",
     "test:mobile": "npm run build && node tests/mobile-live.mjs",
-    "test:ai-live": "npm run build && node tests/ai-live.mjs"
+    "test:ai-live": "npm run build && node tests/ai-live.mjs",
+    "test:updates": "npm run build && node tests/updater-proxy.mjs"
   },
   "dependencies": {
     "@github/copilot": "^1.0.103",
@@ -82,7 +83,16 @@
     },
     "directories": {
       "output": "release"
-    }
+    },
+    "artifactName": "Cyberfox-${version}-${os}-${arch}.${ext}",
+    "npmRebuild": false,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "pickywawa",
+        "repo": "cyberfox"
+      }
+    ]
   },
   "overrides": {
     "zod": "$zod"
@@ -92,5 +102,10 @@
   },
   "engines": {
     "node": ">=22.12.0"
+  },
+  "homepage": "https://github.com/pickywawa/cyberfox",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pickywawa/cyberfox.git"
   }
 }

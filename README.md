@@ -2,6 +2,18 @@
 
 Atelier QA mobile Electron, React et TypeScript : exploration par composants, scénarios Android/iOS, génération exploratoire Codex/Copilot et rapport de rejeu en direct. Thèmes et style inspirés de Cyberdog ; français et anglais.
 
+## Installation et mises à jour
+
+Télécharger le DMG **macOS Apple Silicon (arm64)** depuis les [releases GitHub](https://github.com/pickywawa/cyberfox/releases/latest), puis glisser Cyberfox dans Applications. Cette distribution n’est pas signée ni notariée ; macOS peut demander une autorisation d’ouverture dans Réglages Système → Confidentialité et sécurité. Les autres architectures n’ont pas encore d’installateur publié.
+
+À partir de la version 0.3.0, Cyberfox vérifie les releases stables au démarrage puis toutes les quatre heures. Une nouvelle version affiche le bouton **Nouveau**. Paramètres → **Mises à jour** permet de vérifier manuellement, lire les notes, télécharger avec une barre de progression et activer le téléchargement automatique. Les réglages utilisent le bouton Enregistrer habituel.
+
+Le téléchargement ne ferme jamais l’application. **Installer la mise à jour** demande confirmation avant d’ouvrir le DMG puis fermer Cyberfox ; l’utilisateur remplace ensuite l’application dans Applications. Une exécution de tests active doit être arrêtée au préalable. Les projets et réglages restent dans leurs emplacements habituels. Un fichier déjà téléchargé est retrouvé au prochain contrôle après redémarrage.
+
+La pile réseau Chromium utilise le proxy système et PAC, y compris derrière un VPN, avec rechargement du proxy après une erreur de connexion. Si le VPN ou le pare-feu interdit GitHub, il doit autoriser GitHub et ses hôtes de téléchargement. Les vérifications TLS restent actives. L’installateur est contrôlé par taille et SHA-256 fourni par GitHub avant installation ; aucun fichier incompatible ou sans empreinte n’est exécuté.
+
+Pour produire la prochaine release : incrémenter la version, lancer `npm ci`, `npm run dist -- --mac dmg --arm64`, puis publier le tag et le DMG sur ce dépôt public. Conserver le nom généré `Cyberfox-<version>-mac-arm64.dmg` : le moteur choisit l’installateur selon l’OS et l’architecture. Les préversions sont exclues des mises à jour automatiques.
+
 ## Développement
 
 Node.js 22.12+ et npm :
@@ -78,6 +90,7 @@ npm test
 npx playwright install chromium
 npm run test:e2e
 npm run test:electron
+npm run test:updates
 ```
 
 Les tests couvrent persistance, migration, contraintes de l’arbre, protocole WebDriver, attentes d’assertion, exécution parallèle, préconditions, échecs non bloquants et parcours d’édition/validation. Le test Electron utilise un dossier temporaire isolé.

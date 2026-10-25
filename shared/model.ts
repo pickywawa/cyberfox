@@ -84,6 +84,8 @@ export const settingsSchema = z.object({
   appiumUrl: localUrl.default('http://127.0.0.1:4723'),
   iosTeamId: z.string().max(40).default(''),
   iosWdaBundleId: z.string().max(180).default('com.pickywawa.cyberfox.WebDriverAgentRunner'),
+  checkUpdatesOnStart: z.boolean().default(true),
+  autoDownloadUpdates: z.boolean().default(false),
   analysisMode: z.enum(['automatic', 'ask', 'off']).default('ask'),
   devicesDetached: z.boolean().default(false),
   leftWidth: z.number().min(180).max(600).default(254),
@@ -189,6 +191,7 @@ export interface RunReport {
   persistenceError?: string;
 }
 export type LiveEvent =
+  | { type: 'update'; status: import('./update.js').UpdateStatus }
   | { type: 'device'; deviceId: string; ready: boolean }
   | { type: 'run'; report: RunReport }
   | { type: 'pointer'; deviceId: string; x: number; y: number; width: number; height: number }
@@ -204,6 +207,11 @@ export interface ProjectUpdate {
   selectedNodeId?: string | null;
 }
 export interface Bridge {
+  updateStatus(): Promise<import('./update.js').UpdateStatus>;
+  updateCheck(): Promise<import('./update.js').UpdateStatus>;
+  updateDownload(): Promise<import('./update.js').UpdateStatus>;
+  updateInstall(): Promise<void>;
+  updateRelease(): Promise<void>;
   load(): Promise<Workspace>;
   settingsSave(settings: Settings): Promise<Settings>;
   projectCreate(input: z.infer<typeof projectInput>): Promise<Project>;

@@ -6,7 +6,8 @@ const temporary = await mkdtemp(path.join(os.tmpdir(), 'cyberfox-electron-'));
 let app;
 try {
   app = await electron.launch({
-    args: ['.'],
+    args: process.env.CYBERFOX_EXECUTABLE ? [] : ['.'],
+    ...(process.env.CYBERFOX_EXECUTABLE ? { executablePath: process.env.CYBERFOX_EXECUTABLE } : {}),
     env: { ...process.env, CYBERFOX_USER_DATA: path.join(temporary, 'config') },
     timeout: 30000,
   });
@@ -57,6 +58,7 @@ try {
       codex: codex.authenticated,
       copilot: copilot.authenticated,
       copilotModels: copilot.models.length,
+      copilotError: copilot.error,
       devices: devices.devices.length,
     };
   });
@@ -65,6 +67,7 @@ try {
     JSON.stringify(status),
   );
   expect(errors).toEqual([]);
+  expect(status.copilotError ?? '').not.toMatch(/ENOTDIR|app\.asar/);
 } finally {
   if (app) await app.close();
   await rm(temporary, { recursive: true, force: true });

@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { Bridge, LoginProgress } from '../shared/model.js';
 const bridge: Bridge = {
+  updateStatus: () => ipcRenderer.invoke('update:status'),
+  updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateDownload: () => ipcRenderer.invoke('update:download'),
+  updateInstall: () => ipcRenderer.invoke('update:install'),
+  updateRelease: () => ipcRenderer.invoke('update:release'),
   load: () => ipcRenderer.invoke('workspace:load'),
   settingsSave: (s) => ipcRenderer.invoke('settings:save', s),
   projectCreate: (p) => ipcRenderer.invoke('project:create', p),

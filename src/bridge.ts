@@ -34,6 +34,24 @@ function save(state: Workspace) {
 }
 export const isDesktop = !!window.cyberfox;
 export const api: Bridge = window.cyberfox ?? {
+  updateStatus: async () => ({
+    state: 'idle',
+    currentVersion: __APP_VERSION__,
+    percent: 0,
+    received: 0,
+    total: 0,
+    compatible: false,
+  }),
+  updateCheck: async () => {
+    throw new Error('Vérification disponible dans Electron');
+  },
+  updateDownload: async () => {
+    throw new Error('Téléchargement disponible dans Electron');
+  },
+  updateInstall: async () => {},
+  updateRelease: async () => {
+    window.open('https://github.com/pickywawa/cyberfox/releases/latest', '_blank', 'noopener');
+  },
   load: async () => load(),
   settingsSave: async (settings) => {
     const state = load();

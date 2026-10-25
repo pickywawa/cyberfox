@@ -1,10 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, session } from 'electron';
 import path from 'node:path';
 import { z } from 'zod';
 import { Store } from './store.js';
 import { Devices } from './devices.js';
 import { Ai } from './ai.js';
 import { Automation } from './automation.js';
+import { Updater } from './updater.js';
 import { Runner } from './runner.js';
 import {
   nodeSchema,
@@ -207,8 +208,80 @@ app
       } else detached?.close();
       emit({ type: 'workspace' });
     });
+    const network = session.fromPartition('persist:cyberfox-updates');
+    await network.setProxy({ mode: 'system' });
+    const updater = new Updater({
+      version: app.getVersion(),
+      platform: process.platform,
+      arch: process.arch,
+      directory: path.join(app.getPath('userData'), 'updates'),
+      fetch: (url, init) => network.fetch(url, init),
+      refreshProxy: async () => {
+        await network.forceReloadProxyConfig();
+        await network.closeAllConnections();
+      },
+      emit: (status) => emit({ type: 'update', status }),
+      open: async (file) => {
+        if (runner.isRunning())
+          throw new Error(
+            store.state.settings.language === 'fr'
+              ? 'Arrêtez l’exécution des tests avant la mise à jour.'
+              : 'Stop the test run before updating.',
+          );
+        const fr = store.state.settings.language === 'fr';
+        const result = await dialog.showMessageBox(window!, {
+          type: 'question',
+          title: fr ? 'Mettre à jour Cyberfox' : 'Update Cyberfox',
+          message: fr
+            ? 'Ouvrir l’installateur et fermer Cyberfox ?'
+            : 'Open the installer and close Cyberfox?',
+          detail: fr
+            ? 'Sur macOS, glissez Cyberfox dans Applications et remplacez la version existante. Vos projets et paramètres sont conservés.'
+            : 'On macOS, drag Cyberfox into Applications and replace the existing version. Your projects and settings are preserved.',
+          buttons: fr
+            ? ['Ouvrir et fermer Cyberfox', 'Plus tard']
+            : ['Open and close Cyberfox', 'Later'],
+          defaultId: 0,
+          cancelId: 1,
+          noLink: true,
+        });
+        if (result.response !== 0) return;
+        const error = await shell.openPath(file);
+        if (error) throw new Error(error);
+        app.quit();
+      },
+    });
+    register('update:status', z.undefined(), () => updater.state);
+    register('update:check', z.undefined(), () => updater.check());
+    register('update:download', z.undefined(), () => updater.download());
+    register('update:install', z.undefined(), () => updater.install());
+    register('update:release', z.undefined(), () =>
+      shell.openExternal(
+        updater.state.url ?? 'https://github.com/pickywawa/cyberfox/releases/latest',
+      ),
+    );
     await createWindow();
     if (store.state.settings.devicesDetached) await createWindow(true);
+    const checkAutomatically = () =>
+      updater
+        .check()
+        .then((status) => {
+          if (
+            status.state === 'available' &&
+            status.compatible &&
+            store.state.settings.autoDownloadUpdates
+          )
+            return updater.download();
+        })
+        .catch(() => {});
+    if (app.isPackaged && store.state.settings.checkUpdatesOnStart) void checkAutomatically();
+    const updateTimer = setInterval(
+      () => {
+        if (app.isPackaged && store.state.settings.checkUpdatesOnStart) void checkAutomatically();
+      },
+      4 * 60 * 60 * 1000,
+    );
+    updateTimer.unref();
     app.on('activate', () => {
       if (!window) void createWindow();
     });

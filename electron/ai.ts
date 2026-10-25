@@ -1,10 +1,10 @@
 import { Codex } from '@openai/codex-sdk';
-import { CopilotClient } from '@github/copilot-sdk';
+import { CopilotClient, RuntimeConnection } from '@github/copilot-sdk';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { command, commandEnv, sdkCodexBinary, copilotBinary } from './commands.js';
+import { command, commandEnv, sdkCodexBinary, copilotBinary, copilotRuntime } from './commands.js';
 import {
   parseProposal,
   parseJson,
@@ -41,7 +41,13 @@ export class Ai {
   private copilot() {
     if (!this.client)
       this.client = (async () => {
-        const client = new CopilotClient({ env: commandEnv, logLevel: 'error' });
+        // Native binaries must execute outside Electron's read-only ASAR archive.
+        const runtime = copilotRuntime();
+        const client = new CopilotClient({
+          env: commandEnv,
+          logLevel: 'error',
+          ...(runtime ? { connection: RuntimeConnection.forStdio({ path: runtime }) } : {}),
+        });
         await client.start();
         return client;
       })().catch((e) => {
