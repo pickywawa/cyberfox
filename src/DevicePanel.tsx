@@ -1,3 +1,6 @@
+import { ReplayDevices } from './ReplayDevices';
+import { PlatformIcon } from './PlatformIcon';
+import { DeviceStatus } from './DeviceStatus';
 import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
@@ -26,22 +29,7 @@ import {
 } from '../shared/model';
 import type { L } from './NodeEditor';
 export function OSIcon({ os }: { os: OS }) {
-  return os === 'android' ? (
-    <svg
-      viewBox="0 0 24 24"
-      width="17"
-      height="17"
-      fill="currentColor"
-      className="os-android"
-      aria-label="Android"
-    >
-      <path d="m7 4-2-3 .8-.5L8 3.5a11 11 0 0 1 8 0L18.2.5l.8.5-2 3a9 9 0 0 1 5 8H2a9 9 0 0 1 5-8M7 7a1 1 0 1 0 0 2 1 1 0 0 0 0-2m10 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2M3 13h18v6a2 2 0 0 1-2 2h-1v2h-3v-2H9v2H6v-2H5a2 2 0 0 1-2-2Z" />
-    </svg>
-  ) : (
-    <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-label="iOS">
-      <path d="M16 1c.3 2-1.4 4-3.4 4 .1-2 1.6-3.7 3.4-4M19.8 17.8C19 19.5 18 22 16 22c-1.2 0-1.8-.8-3.4-.8S10.3 22 9 22c-2 0-5-4.4-5-8.6 0-4.1 2.4-6.2 5-6.2 1.4 0 2.6.9 3.6.9s2.5-1 4.2-1c1.6 0 3 .8 3.8 2-3.5 2-3 6.6-.8 8.7" />
-    </svg>
-  );
+  return <PlatformIcon platform={os} size={17} />;
 }
 function Picker({
   os,
@@ -105,7 +93,7 @@ function Picker({
       >
         <OSIcon os={os} />
         <span>{d?.name ?? L('Choisir ', 'Select ') + (os === 'ios' ? 'iOS' : 'Android')}</span>
-        {scanning ? <LoaderCircle size={13} className="spin" /> : <ChevronDown size={14} />}
+        <ChevronDown size={14} />
       </button>
       {open && (
         <div role="listbox" className="device-menu">
@@ -120,6 +108,14 @@ function Picker({
             {L('Aucun appareil', 'No device')}
           </button>
           {devices.filter((d) => d.platform === os && d.kind === 'usb').map(item)}
+          {devices.some((d) => d.platform === os && d.kind === 'network') && (
+            <small>{L('Réseau', 'Network')}</small>
+          )}
+          {devices.filter((d) => d.platform === os && d.kind === 'network').map(item)}
+          {devices.some((d) => d.platform === os && d.kind === 'manual') && (
+            <small>{L('Configuration manuelle', 'Manual configuration')}</small>
+          )}
+          {devices.filter((d) => d.platform === os && d.kind === 'manual').map(item)}
           <button className="simulator-group" onClick={() => setSimulators(!simulators)}>
             {simulators ? <ChevronDown size={13} /> : <ChevronRight size={13} />}{' '}
             {L('Simulateurs / émulateurs', 'Simulators / emulators')}
@@ -138,10 +134,15 @@ function Picker({
   );
 }
 export function DevicePanel({
+  replay,
+  historyFrames = [],
+  onLive,
+  onBindScreen,
   project,
   scan,
   scanning,
   onRefresh,
+  onSettings,
   onSelect,
   onReady,
   onBind,
@@ -150,10 +151,15 @@ export function DevicePanel({
   onDetach,
   L,
 }: {
+  replay?: import('../shared/model').ReplayFrame | null;
+  historyFrames?: import('../shared/model').ReplayFrame[];
+  onLive?: () => void;
+  onBindScreen?: (os: OS, component: Component) => void;
   project?: Project;
   scan: DeviceScan;
   scanning: boolean;
   onRefresh: () => void;
+  onSettings: () => void;
   onSelect: (os: OS, id: string) => void;
   onReady: (os: OS, ready: boolean) => void;
   onBind: (os: OS, component: Component) => void;
@@ -181,46 +187,63 @@ export function DevicePanel({
         <div>
           <button
             className="icon-button"
-            title={
-              detached
-                ? L('Réintégrer les appareils', 'Dock devices')
-                : L('Externaliser les appareils', 'Detach devices')
-            }
-            aria-label={detached ? 'Réintégrer les appareils' : 'Externaliser les appareils'}
-            onClick={onDetach}
-          >
-            {detached ? <ArrowLeftToLine size={16} /> : <ExternalLink size={16} />}
-          </button>
-          <button
-            className="icon-button"
             aria-label={L('Actualiser les appareils', 'Refresh devices')}
             onClick={onRefresh}
           >
             <RefreshCw size={15} className={scanning ? 'spin' : ''} />
           </button>
+          <button
+            className="icon-button panel-detach-button"
+            title={
+              detached
+                ? L('Réintégrer les appareils', 'Dock devices')
+                : L('Externaliser les appareils', 'Detach devices')
+            }
+            aria-label={
+              detached
+                ? L('Réintégrer les appareils', 'Dock devices')
+                : L('Externaliser les appareils', 'Detach devices')
+            }
+            onClick={onDetach}
+          >
+            {detached ? <ArrowLeftToLine size={16} /> : <ExternalLink size={16} />}
+          </button>
         </div>
       </div>
-      <div className="device-hint">
-        <Usb size={14} />
-        {L('Composants réels · aucune action à l’aveugle', 'Real components · no blind actions')}
-      </div>
-      <div className={'mobile-zones ' + (wide && oses.length === 2 ? 'side-by-side' : '')}>
-        {oses.map((os) => (
-          <Mobile
-            key={os}
-            os={os}
-            id={project?.deviceIds[os] ?? ''}
-            devices={scan.devices}
-            scanning={scanning}
-            onRefresh={onRefresh}
-            onSelect={(id) => onSelect(os, id)}
-            onReady={(ready) => onReady(os, ready)}
-            onBind={(c) => onBind(os, c)}
-            onPerform={() => onPerform(os)}
-            canBind={!!project?.selectedNodeId}
-            L={L}
-          />
-        ))}
+      {replay && project && (
+        <ReplayDevices
+          project={project}
+          frame={replay}
+          frames={historyFrames}
+          onLive={() => onLive?.()}
+          L={L}
+        />
+      )}
+      <div className="live-device-content" hidden={!!replay && !!project}>
+        <div className="device-hint">
+          <Usb size={14} />
+          {L('Composants réels · aucune action à l’aveugle', 'Real components · no blind actions')}
+        </div>
+        <div className={'mobile-zones ' + (wide && oses.length === 2 ? 'side-by-side' : '')}>
+          {oses.map((os) => (
+            <Mobile
+              key={`${project?.id ?? 'none'}:${os}`}
+              onBindScreen={onBindScreen ? (component) => onBindScreen(os, component) : undefined}
+              os={os}
+              id={project?.deviceIds[os] ?? ''}
+              devices={scan.devices}
+              scanning={scanning}
+              onRefresh={onRefresh}
+              onSettings={onSettings}
+              onSelect={(id) => onSelect(os, id)}
+              onReady={(ready) => onReady(os, ready)}
+              onBind={(c) => onBind(os, c)}
+              onPerform={() => onPerform(os)}
+              canBind={!!project?.selectedNodeId}
+              L={L}
+            />
+          ))}
+        </div>
       </div>
       <details className="device-diagnostics">
         <summary>{L('Diagnostics de connexion', 'Connection diagnostics')}</summary>
@@ -229,7 +252,7 @@ export function DevicePanel({
         ))}
         <p>
           {L(
-            'iOS physique : configurer le Team ID Apple et un profil WebDriverAgent dans les paramètres.',
+            'iOS physique : configurer le Team ID Apple et un profil WebDriverAgent dans Cyberfox → Paramètres → Appareils.',
             'Physical iOS: configure Apple Team ID and a WebDriverAgent provisioning profile in settings.',
           )}
         </p>
@@ -238,11 +261,13 @@ export function DevicePanel({
   );
 }
 function Mobile({
+  onBindScreen,
   os,
   id,
   devices,
   scanning,
   onRefresh,
+  onSettings,
   onSelect,
   onReady,
   onBind,
@@ -250,11 +275,13 @@ function Mobile({
   canBind,
   L,
 }: {
+  onBindScreen?: (component: Component) => void;
   os: OS;
   id: string;
   devices: Device[];
   scanning: boolean;
   onRefresh: () => void;
+  onSettings: () => void;
   onSelect: (id: string) => void;
   onReady: (value: boolean) => void;
   onBind: (c: Component) => void;
@@ -264,6 +291,7 @@ function Mobile({
 }) {
   const [screen, setScreen] = useState<Screen>();
   const [image, setImage] = useState('');
+  const [mirrorOk, setMirrorOk] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [component, setComponent] = useState<Component>();
@@ -306,6 +334,7 @@ function Mobile({
     alive.current++;
     setScreen(undefined);
     setImage('');
+    setMirrorOk(false);
     setError('');
     setComponent(undefined);
     onReady(false);
@@ -318,11 +347,14 @@ function Mobile({
     const next = async () => {
       try {
         const image = await api.screenshot(id);
-        if (!disposed) setImage(image);
+        if (!disposed) {
+          setImage(image);
+          setMirrorOk(true);
+        }
       } catch (e) {
+        if (!disposed) setMirrorOk(false);
         if (!disposed && !loading) {
           setError((old) => old || String(e));
-          onReady(false);
         }
       } finally {
         if (!disposed) timer = setTimeout(next, 1200);
@@ -448,16 +480,51 @@ function Mobile({
             >
               <Play size={14} />
             </button>
+            <DeviceStatus
+              id={id}
+              mirror={mirrorOk}
+              loading={loading}
+              onSettings={onSettings}
+              onReconnect={() => void inspect()}
+              L={L}
+            />
           </div>
           <div className="live-screen">
-            <img
-              ref={img}
-              src={image || undefined}
-              alt={L('Écran ', 'Screen ') + os}
-              onClick={pick}
-            />
+            {image ? (
+              <img
+                ref={img}
+                src={image || undefined}
+                alt={L('Écran ', 'Screen ') + os}
+                onClick={pick}
+              />
+            ) : (
+              <div className="screen-placeholder" role="status">
+                <Smartphone size={32} />
+                <b>
+                  {loading
+                    ? L('Connexion à l’appareil…', 'Connecting to device…')
+                    : L('Écran indisponible', 'Screen unavailable')}
+                </b>
+                <p>
+                  {loading
+                    ? os === 'ios'
+                      ? L(
+                          'Préparation de WebDriverAgent. La première connexion peut prendre plusieurs minutes.',
+                          'Preparing WebDriverAgent. First connection may take several minutes.',
+                        )
+                      : L('Préparation d’UiAutomator2…', 'Preparing UiAutomator2…')
+                    : L(
+                        'Consultez le diagnostic ci-dessous et réessayez la connexion.',
+                        'Check the diagnosis below and retry the connection.',
+                      )}
+                </p>
+                {!loading && (
+                  <button onClick={() => void inspect()}>{L('Reconnecter', 'Reconnect')}</button>
+                )}
+              </div>
+            )}
             {pointer && <span className="red-pointer" style={pointerPosition()} />}
-            {loading && (
+            {loading && image && (
               <div className="screen-loading">
                 <LoaderCircle className="spin" />
                 <span>
@@ -472,6 +539,9 @@ function Mobile({
           {error && (
             <div className="device-error" role="alert">
               {error}
+              <button onClick={onSettings}>
+                {L('Cyberfox → Paramètres → Appareils', 'Cyberfox → Settings → Devices')}
+              </button>
             </div>
           )}
           <details className="components-list">
@@ -495,6 +565,15 @@ function Mobile({
               <small>
                 {component.locator?.using} · {component.locator?.value}
               </small>
+              {onBindScreen && (
+                <button onClick={() => onBindScreen(component)}>
+                  <Link2 size={13} />
+                  {L(
+                    'Ajouter comme repère de l’écran destination',
+                    'Add as destination screen marker',
+                  )}
+                </button>
+              )}
               <button disabled={!canBind} onClick={() => onBind(component)}>
                 <Link2 size={13} />
                 {L('Associer à l’élément courant', 'Bind to current item')}
@@ -532,8 +611,8 @@ function Mobile({
           <b>{L('Associer un appareil ', 'Pair a device ') + (os === 'ios' ? 'iOS' : 'Android')}</b>
           <p>
             {L(
-              'Branchez le téléphone, puis ouvrez la liste.',
-              'Connect a phone, then open the device list.',
+              'Les téléphones USB autorisés sont sélectionnés et connectés automatiquement.',
+              'Authorized USB phones are automatically selected and connected.',
             )}
           </p>
         </div>

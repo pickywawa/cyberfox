@@ -1,0 +1,77 @@
+import type { ScenarioNode, OS, Variant } from '../shared/model.js';
+
+/** Uses the same precondition and blocking rules as scenario execution. */
+export async function replayProposal(
+  nodes: ScenarioNode[],
+  platform: OS,
+  perform: (variant: Variant, kind: ScenarioNode['kind']) => Promise<void>,
+  record: (entry: unknown) => Promise<void>,
+  signal: AbortSignal,
+  verify?: (node: ScenarioNode) => Promise<void>,
+) {
+  let assertions = 0;
+  const errors: string[] = [];
+  const sequence = async (list: ScenarioNode[]): Promise<boolean> => {
+    for (let index = 0; index < list.length; index++) {
+      signal.throwIfAborted();
+      const node = list[index];
+      let allowed = true;
+      if (node.preconditionId) {
+        const test = list[index - 1];
+        try {
+          const variant = test?.variants[platform];
+          if (!variant || test.kind !== 'test' || test.id !== node.preconditionId)
+            throw new Error('Précondition non configurée');
+          await perform(variant, 'test');
+          await record({
+            type: 'replay-precondition',
+            nodeId: test.id,
+            platform,
+            status: 'passed',
+          });
+        } catch (error) {
+          signal.throwIfAborted();
+          allowed = false;
+          await record({
+            type: 'replay-precondition',
+            nodeId: node.preconditionId,
+            platform,
+            status: 'failed',
+            message: String(error),
+          });
+        }
+      }
+      let failed = false;
+      if (!allowed)
+        await record({ type: 'replay-step', nodeId: node.id, platform, status: 'skipped' });
+      else if (node.kind !== 'scenario') {
+        try {
+          const variant = node.variants[platform];
+          if (!variant) throw new Error('Variante manquante : ' + node.name);
+          await perform(variant, node.kind);
+          await verify?.(node);
+          if (node.kind === 'test') assertions++;
+          await record({ type: 'replay-step', nodeId: node.id, platform, status: 'passed' });
+        } catch (error) {
+          signal.throwIfAborted();
+          failed = true;
+          errors.push(node.name + ': ' + String(error));
+          await record({
+            type: 'replay-step',
+            nodeId: node.id,
+            platform,
+            status: 'failed',
+            message: String(error),
+          });
+        }
+      }
+      if (failed && node.blocking) return true;
+      if ((allowed || node.childrenOnPreconditionFailure) && (await sequence(node.children)))
+        return true;
+    }
+    return false;
+  };
+  await sequence(nodes);
+  if (errors.length) throw new Error(errors.join('\n'));
+  if (!assertions) throw new Error('Aucune assertion pour confirmer le résultat métier.');
+}

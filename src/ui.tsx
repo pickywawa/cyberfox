@@ -1,3 +1,5 @@
+import { PlatformIcon } from './PlatformIcon';
+import { DeviceSetup } from './DeviceSetup';
 import { UpdatePanel } from './UpdatePanel';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
@@ -32,6 +34,7 @@ import {
   nodePath,
   parseProposal,
   projectInput,
+  requiredOS,
   type AiReply,
   type Device,
   type DeviceScan,
@@ -108,7 +111,12 @@ export function Modal({
     return () => d.close();
   }, []);
   return (
-    <dialog ref={ref} className={wide ? 'modal wide' : 'modal'} onCancel={onClose}>
+    <dialog
+      aria-label={title}
+      ref={ref}
+      className={wide ? 'modal wide' : 'modal'}
+      onCancel={onClose}
+    >
       <header>
         <h2>{title}</h2>
         <button className="icon-button" aria-label="Close" onClick={onClose}>
@@ -120,6 +128,7 @@ export function Modal({
   );
 }
 export function NewProject({
+  project,
   L,
   root,
   onClose,
@@ -128,17 +137,100 @@ export function NewProject({
   L: Translate;
   root: string;
   onClose: () => void;
-  onCreate: (v: { name: string; platforms: Project['platforms'] }) => Promise<void>;
+  project?: Project;
+  onCreate: (v: {
+    name: string;
+    platforms: Project['platforms'];
+    applications?: Project['applications'];
+    applicationDetails?: Project['applicationDetails'];
+  }) => Promise<void>;
 }) {
-  const [name, setName] = useState('');
-  const [platforms, setPlatforms] = useState<Project['platforms']>(['android', 'ios']);
+  const [name, setName] = useState(project?.name ?? '');
+  const [platforms, setPlatforms] = useState<Project['platforms']>(
+    project?.platforms ?? ['android', 'ios'],
+  );
+  const [applications, setApplications] = useState({
+    android: project?.applications?.android ?? '',
+    ios: project?.applications?.ios ?? '',
+  });
+  const [details, setDetails] = useState<Project['applicationDetails']>(
+    project?.applicationDetails ?? {},
+  );
+  const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
+  const [sourceDevices, setSourceDevices] = useState<Partial<Record<'android' | 'ios', string>>>(
+    project?.deviceIds ?? {},
+  );
+  useEffect(() => {
+    let active = true;
+    void api
+      .devicesScan()
+      .then((scan) => {
+        if (!active) return;
+        const ready = scan.devices.filter((device) => device.status === 'ready');
+        setAvailableDevices(ready);
+        setSourceDevices((old) => ({
+          android: old.android || ready.find((device) => device.platform === 'android')?.id,
+          ios: old.ios || ready.find((device) => device.platform === 'ios')?.id,
+        }));
+      })
+      .catch((error) => {
+        if (active) setError(String(error));
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  const [detecting, setDetecting] = useState<string | null>(null);
+  const [appPicker, setAppPicker] = useState<{
+    os: 'android' | 'ios';
+    apps: { id: string; name: string }[];
+  } | null>(null);
+  const [appSearch, setAppSearch] = useState('');
+  async function discoverApps(os: 'android' | 'ios', mode: 'current' | 'list') {
+    if (!sourceDevices[os]) return;
+    setDetecting(os);
+    setError('');
+    setAppPicker(null);
+    setAppSearch('');
+    try {
+      const apps = await api.projectApplications({
+        projectId: project?.id,
+        deviceId: sourceDevices[os],
+        platform: os,
+        mode,
+      });
+      if (mode === 'list') setAppPicker({ os, apps });
+      else if (apps[0]) selectApplication(os, apps[0]);
+    } catch (error) {
+      setError(String(error));
+    } finally {
+      setDetecting(null);
+    }
+  }
+  function selectApplication(os: 'android' | 'ios', app: { id: string; name: string }) {
+    setApplications((old) => ({ ...old, [os]: app.id }));
+    setDetails((old) => ({ ...old, [os]: app }));
+    setAppPicker(null);
+  }
+
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   async function submit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      await onCreate(projectInput.parse({ name, platforms }));
+      await onCreate(
+        projectInput.parse({
+          name,
+          platforms,
+          applications,
+          applicationDetails: Object.fromEntries(
+            Object.entries(details ?? {}).filter(
+              ([os, detail]) => detail?.id === applications[os as 'android' | 'ios'],
+            ),
+          ),
+        }),
+      );
     } catch (e) {
       setError(String(e));
     } finally {
@@ -146,7 +238,15 @@ export function NewProject({
     }
   }
   return (
-    <Modal title={L('Nouveau projet', 'New project')} onClose={onClose}>
+    <Modal
+      wide
+      title={
+        project
+          ? L('Configurer le projet', 'Configure project')
+          : L('Nouveau projet', 'New project')
+      }
+      onClose={onClose}
+    >
       <form onSubmit={submit}>
         <div className="modal-body">
           <label>
@@ -173,7 +273,7 @@ export function NewProject({
                     )
                   }
                 />
-                {p === 'android' ? <Smartphone /> : p === 'ios' ? <Smartphone /> : <Layers3 />}
+                <PlatformIcon platform={p} size={22} />
                 <b>{p === 'ios' ? 'iOS' : p === 'android' ? 'Android' : 'Flutter'}</b>
               </label>
             ))}
@@ -184,11 +284,207 @@ export function NewProject({
               'Flutter can be combined with Android and iOS. Only selected platforms are offered in mobile views.',
             )}
           </p>
+          <h3>{L('Applications à lancer', 'Applications to launch')}</h3>
+          <p className="muted">
+            {L(
+              'Cyberfox active l’application installée avant l’exploration ou l’exécution si elle n’est pas au premier plan. Laissez vide pour garder l’application courante.',
+              'Cyberfox activates the installed app before exploration or execution if it is not in the foreground. Leave empty to keep the current app.',
+            )}
+          </p>
+          <div className="project-applications-grid">
+            {requiredOS({ platforms }).map((os) => (
+              <div className="project-application-config" key={os}>
+                <h4>
+                  <PlatformIcon platform={os} />
+                  {L('Application', 'Application')} {os === 'ios' ? 'iOS' : 'Android'}
+                </h4>
+                <label>
+                  {os === 'ios'
+                    ? 'iOS · Bundle ID'
+                    : L('Android · Nom du package', 'Android · Package name')}
+                  <input
+                    value={applications[os]}
+                    disabled={!!detecting}
+                    placeholder="com.example.app"
+                    maxLength={255}
+                    onChange={(e) => setApplications((old) => ({ ...old, [os]: e.target.value }))}
+                  />
+                </label>
+                {
+                  <>
+                    <label>
+                      {L('Appareil source', 'Source device')} · {os === 'ios' ? 'iOS' : 'Android'}
+                      <select
+                        value={sourceDevices[os] ?? ''}
+                        disabled={!!detecting}
+                        onChange={(e) => {
+                          setSourceDevices((old) => ({ ...old, [os]: e.target.value }));
+                          setAppPicker(null);
+                        }}
+                      >
+                        <option value="">
+                          {L('Choisir un appareil connecté', 'Choose a connected device')}
+                        </option>
+                        {sourceDevices[os] &&
+                          !availableDevices.some((device) => device.id === sourceDevices[os]) && (
+                            <option value={sourceDevices[os]}>
+                              {L('Appareil associé non connecté', 'Paired device disconnected')}
+                            </option>
+                          )}
+                        {availableDevices
+                          .filter((device) => device.platform === os)
+                          .map((device) => (
+                            <option key={device.id} value={device.id}>
+                              {device.name}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                    <div className="application-discovery-actions">
+                      <button
+                        type="button"
+                        disabled={!sourceDevices[os] || !!detecting}
+                        onClick={() => void discoverApps(os, 'current')}
+                      >
+                        <Smartphone size={14} />
+                        {L('Application ouverte', 'Current application')}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!sourceDevices[os] || !!detecting}
+                        onClick={() => void discoverApps(os, 'list')}
+                      >
+                        <FolderOpen size={14} />
+                        {L('Parcourir les applications', 'Browse applications')}
+                      </button>
+                    </div>
+                    {!sourceDevices[os] && (
+                      <p className="note">
+                        {L(
+                          'Connectez un appareil pour détecter ses applications.',
+                          'Connect a device to discover its applications.',
+                        )}
+                      </p>
+                    )}
+                    {detecting === os && (
+                      <p role="status" className="application-discovery-loading">
+                        <LoaderCircle size={14} className="spin" />
+                        {L('Lecture de l’appareil…', 'Reading device…')}
+                      </p>
+                    )}
+                    {appPicker?.os === os && (
+                      <div className="application-picker">
+                        <div className="application-picker-search">
+                          <input
+                            autoFocus
+                            aria-label={L('Rechercher une application', 'Search applications')}
+                            placeholder={L('Nom ou identifiant…', 'Name or identifier…')}
+                            value={appSearch}
+                            onChange={(e) => setAppSearch(e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="icon-button"
+                            aria-label={L(
+                              'Fermer la liste des applications',
+                              'Close application list',
+                            )}
+                            onClick={() => setAppPicker(null)}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div className="application-picker-results">
+                          {appPicker.apps
+                            .filter((app) =>
+                              (app.name + ' ' + app.id)
+                                .toLowerCase()
+                                .includes(appSearch.toLowerCase()),
+                            )
+                            .map((app) => (
+                              <button
+                                type="button"
+                                key={app.id}
+                                className={applications[os] === app.id ? 'selected' : ''}
+                                onClick={() => selectApplication(os, app)}
+                              >
+                                <strong>{app.name}</strong>
+                                {app.name !== app.id && <small>{app.id}</small>}
+                                {applications[os] === app.id && <Check size={14} />}
+                              </button>
+                            ))}
+                          {!appPicker.apps.some((app) =>
+                            (app.name + ' ' + app.id)
+                              .toLowerCase()
+                              .includes(appSearch.toLowerCase()),
+                          ) && (
+                            <p className="note">
+                              {L('Aucune application trouvée.', 'No applications found.')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                }
+                <label>
+                  {L('Nom de l’application', 'Application name')} ·{' '}
+                  {os === 'ios' ? 'iOS' : 'Android'}
+                  <input
+                    value={details?.[os]?.id === applications[os] ? (details[os]?.name ?? '') : ''}
+                    maxLength={180}
+                    disabled={!applications[os] || !!detecting}
+                    onChange={(e) =>
+                      setDetails((old) => ({
+                        ...old,
+                        [os]: {
+                          ...(old?.[os]?.id === applications[os] ? old[os] : {}),
+                          id: applications[os],
+                          name: e.target.value,
+                        },
+                      }))
+                    }
+                  />
+                </label>
+                {details?.[os]?.id === applications[os] && details[os]?.icon && (
+                  <img className="project-app-icon" src={details[os]?.icon} alt="" />
+                )}
+                {
+                  <button
+                    type="button"
+                    disabled={!applications[os] || !sourceDevices[os] || !!detecting}
+                    onClick={async () => {
+                      setDetecting(os);
+                      setError('');
+                      try {
+                        const info = await api.projectApplicationInfo({
+                          projectId: project?.id,
+                          deviceId: sourceDevices[os],
+                          platform: os,
+                          application: applications[os],
+                        });
+                        setDetails((old) => ({ ...old, [os]: info }));
+                      } catch (error) {
+                        setError(String(error));
+                      } finally {
+                        setDetecting(null);
+                      }
+                    }}
+                  >
+                    {detecting === os ? (
+                      <LoaderCircle size={14} className="spin" />
+                    ) : (
+                      <RefreshCw size={14} />
+                    )}
+                    {L('Lire le nom et l’icône', 'Read name and icon')}
+                  </button>
+                }
+              </div>
+            ))}
+          </div>
           <div className="directory-preview">
             <Folder size={15} />
-            <span>
-              {root}/{name || '…'}
-            </span>
+            <span>{project ? project.directory : `${root}/${name || '…'}`}</span>
           </div>
           {error && (
             <p role="alert" className="form-error">
@@ -200,9 +496,14 @@ export function NewProject({
           <button type="button" onClick={onClose}>
             {L('Annuler', 'Cancel')}
           </button>
-          <button className="primary" disabled={saving || !name.trim() || !platforms.length}>
+          <button
+            className="primary"
+            disabled={saving || !!detecting || !name.trim() || !platforms.length}
+          >
             {saving ? <LoaderCircle size={15} className="spin" /> : <Plus size={15} />}{' '}
-            {L('Créer le projet', 'Create project')}
+            {project
+              ? L('Enregistrer le projet', 'Save project')
+              : L('Créer le projet', 'Create project')}
           </button>
         </footer>
       </form>
@@ -210,6 +511,9 @@ export function NewProject({
   );
 }
 export function SettingsModal({
+  project,
+  onApplicationsSave,
+  iosDeviceId,
   L,
   tab,
   setTab,
@@ -219,6 +523,9 @@ export function SettingsModal({
   onClose,
   onSave,
 }: {
+  project?: import('../shared/model').Project;
+  onApplicationsSave?: (applications: { android: string; ios: string }) => Promise<void>;
+  iosDeviceId?: string;
   L: Translate;
   tab: string;
   setTab: (v: string) => void;
@@ -229,6 +536,11 @@ export function SettingsModal({
   onSave: (s: Settings) => Promise<void>;
 }) {
   const [draft, setDraft] = useState(settings);
+  const [applications, setApplications] = useState({
+    android: project?.applications?.android ?? '',
+    ios: project?.applications?.ios ?? '',
+  });
+  const [deviceTab, setDeviceTab] = useState<'ios' | 'android'>('ios');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [checking, setChecking] = useState(false);
@@ -237,10 +549,16 @@ export function SettingsModal({
   useEffect(
     () =>
       api.onLogin((progress) => {
-        if (progress.provider === draft.provider) setLogin(progress);
+        if (progress.provider === draft.provider) {
+          setLogin(progress);
+          if (!progress.running) void refreshStatus(progress.provider);
+        }
       }),
     [draft.provider],
   );
+  useEffect(() => {
+    void refreshStatus(draft.provider);
+  }, [draft.provider]);
   const status = statuses[draft.provider];
   const update = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setDraft((s) => ({ ...s, [key]: value }));
@@ -260,6 +578,7 @@ export function SettingsModal({
   const tabs = [
     ['appearance', L('Apparence', 'Appearance'), Monitor],
     ['projects', L('Projets', 'Projects'), FolderOpen],
+    ['creation', L('Création', 'Creation'), Sparkles],
     ['ai', L('Intégration IA', 'AI integration'), Bot],
     ['devices', L('Appareils', 'Devices'), Smartphone],
     ['execution', L('Exécution', 'Execution'), Play],
@@ -370,6 +689,52 @@ export function SettingsModal({
           {tab === 'projects' && (
             <>
               <span className="eyebrow">{L('ORGANISATION LOCALE', 'LOCAL ORGANIZATION')}</span>
+              {project && (
+                <>
+                  <h3>
+                    {L('Application du projet', 'Project application')} · {project.name}
+                  </h3>
+                  <label>
+                    Android · {L('Nom du package', 'Package name')}
+                    <input
+                      value={applications.android}
+                      placeholder="com.example.app"
+                      onChange={(e) => setApplications((s) => ({ ...s, android: e.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    iOS · Bundle ID
+                    <input
+                      value={applications.ios}
+                      placeholder="com.example.app"
+                      onChange={(e) => setApplications((s) => ({ ...s, ios: e.target.value }))}
+                    />
+                  </label>
+                  <p className="muted">
+                    {L(
+                      'L’application installée est activée automatiquement avant l’exploration si elle n’est pas au premier plan. Laissez vide pour garder l’application courante.',
+                      'The installed app is automatically activated before exploration if it is not in the foreground. Leave empty to keep the current app.',
+                    )}
+                  </p>
+                  <button
+                    disabled={saving}
+                    onClick={async () => {
+                      setSaving(true);
+                      setError('');
+                      try {
+                        await onApplicationsSave?.(applications);
+                        setNotice(L('Application enregistrée', 'Application saved'));
+                      } catch (e) {
+                        setError(String(e));
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  >
+                    {L('Enregistrer l’application du projet', 'Save project application')}
+                  </button>
+                </>
+              )}
               <h3>{L('Dossier des projets', 'Projects directory')}</h3>
               <p className="muted">
                 {L(
@@ -405,6 +770,85 @@ export function SettingsModal({
               </div>
             </>
           )}
+          {tab === 'creation' && (
+            <>
+              <h3>{L('Création assistée par IA', 'AI-assisted creation')}</h3>
+              <label>
+                {L('Nombre maximal de décisions', 'Maximum decisions')}
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={draft.creationMaxDecisions}
+                  onChange={(e) => update('creationMaxDecisions', Number(e.target.value))}
+                />
+              </label>
+              <label>
+                {L(
+                  'Durée maximale (minutes, questions comprises)',
+                  'Maximum duration (minutes, including questions)',
+                )}
+                <input
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={draft.creationTimeoutMinutes}
+                  onChange={(e) => update('creationTimeoutMinutes', Number(e.target.value))}
+                />
+              </label>
+              <label>
+                {L('Instructions complémentaires', 'Additional instructions')}
+                <textarea
+                  rows={8}
+                  maxLength={20000}
+                  value={draft.creationPrompt}
+                  onChange={(e) => update('creationPrompt', e.target.value)}
+                />
+              </label>
+              <p className="muted">
+                {L(
+                  'Ces instructions complètent les règles embarquées de sécurité et de validation. Les traces sont enregistrées automatiquement dans le projet ; les saisies utilisent des variables.',
+                  'These instructions supplement embedded safety and validation rules. Traces are saved automatically in the project; inputs use variables.',
+                )}
+              </p>
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={draft.creationReplay}
+                  onChange={(e) => update('creationReplay', e.target.checked)}
+                />
+                {L(
+                  'Rejouer avant validation (relance l’application, conserve ses données)',
+                  'Replay before review (restarts app, preserves its data)',
+                )}
+              </label>
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={draft.creationQuestions}
+                  onChange={(e) => update('creationQuestions', e.target.checked)}
+                />
+                {L(
+                  'Autoriser les demandes de précision en mode interactif',
+                  'Allow clarification questions in interactive mode',
+                )}
+              </label>
+              <button
+                onClick={() =>
+                  setDraft((s) => ({
+                    ...s,
+                    creationMaxDecisions: 40,
+                    creationTimeoutMinutes: 10,
+                    creationPrompt: '',
+                    creationReplay: true,
+                    creationQuestions: true,
+                  }))
+                }
+              >
+                {L('Rétablir les valeurs par défaut', 'Restore defaults')}
+              </button>
+            </>
+          )}
           {tab === 'ai' && (
             <>
               <span className="eyebrow">{L('VOTRE COPILOTE DE QA', 'YOUR QA COPILOT')}</span>
@@ -437,7 +881,7 @@ export function SettingsModal({
                 <span className={'dot ' + (status?.authenticated ? 'green' : '')} />
                 <b>
                   {status?.authenticated
-                    ? L('Session disponible', 'Session available')
+                    ? L('IA connectée · prête à être utilisée', 'AI connected · ready to use')
                     : L('Connexion à vérifier', 'Connection to verify')}
                 </b>
                 <button onClick={() => void check()} disabled={checking}>
@@ -448,20 +892,39 @@ export function SettingsModal({
               {status && <p className="connection-message">{status.message}</p>}
               <button
                 className="primary"
-                disabled={!isDesktop || login.running}
+                disabled={!isDesktop || login.running || checking}
                 onClick={async () => {
                   try {
+                    if (status?.authenticated) {
+                      setChecking(true);
+                      await api.logout(draft.provider);
+                      setLogin({ output: '', running: false });
+                      await refreshStatus(draft.provider);
+                      return;
+                    }
                     setLogin({ output: L('Connexion en cours…', 'Connecting…'), running: true });
                     await api.login(draft.provider);
                   } catch (e) {
                     setError(String(e));
                     setLogin({ output: '', running: false });
+                  } finally {
+                    setChecking(false);
                   }
                 }}
               >
                 <Bot size={16} />
-                {L('Connecter mon compte', 'Connect my account')}
+                {status?.authenticated
+                  ? L('Déconnecter mon compte', 'Disconnect my account')
+                  : L('Connecter mon compte', 'Connect my account')}
               </button>
+              {status?.authenticated && (
+                <p className="note">
+                  {L(
+                    'Votre compte est connecté : vous pouvez utiliser le chat pour générer des scénarios. Cette session est partagée avec le CLI officiel ; la déconnexion peut aussi affecter son usage dans le terminal. La disponibilité du modèle et les quotas restent soumis à votre abonnement.',
+                    'Your account is connected: use the chat to generate scenarios. This session is shared with the official CLI; disconnecting may also affect terminal use. Model access and quotas depend on your subscription.',
+                  )}
+                </p>
+              )}
               {login.output && (
                 <pre className="login-output" role="status">
                   {login.output}
@@ -469,8 +932,8 @@ export function SettingsModal({
               )}
               <label>
                 {L('Modèle', 'Model')}
-                <input
-                  list="ai-models"
+                <select
+                  aria-label={L('Modèle', 'Model')}
                   value={draft.provider === 'codex' ? draft.codexModel : draft.copilotModel}
                   onChange={(e) =>
                     update(
@@ -478,26 +941,60 @@ export function SettingsModal({
                       e.target.value,
                     )
                   }
-                  placeholder={L('Modèle par défaut du fournisseur', 'Provider default model')}
-                />
-                <datalist id="ai-models">
+                >
+                  <option value="">
+                    {L('Modèle par défaut du fournisseur', 'Provider default model')}
+                  </option>
+                  {(draft.provider === 'codex' ? draft.codexModel : draft.copilotModel) &&
+                    !status?.models.some(
+                      (m) =>
+                        m.id ===
+                        (draft.provider === 'codex' ? draft.codexModel : draft.copilotModel),
+                    ) && (
+                      <option
+                        value={draft.provider === 'codex' ? draft.codexModel : draft.copilotModel}
+                      >
+                        {draft.provider === 'codex' ? draft.codexModel : draft.copilotModel}
+                      </option>
+                    )}
                   {status?.models.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
                     </option>
                   ))}
-                </datalist>
+                </select>
               </label>
               <p className="note">
                 {draft.provider === 'codex'
                   ? L(
-                      'Catalogue local Codex si disponible ; vous pouvez saisir un identifiant de modèle autorisé par votre compte. Vide = modèle par défaut de Codex.',
-                      'Local Codex catalog when available; you can enter a model ID allowed by your account. Empty = Codex default.',
+                      'Les modèles proviennent du catalogue local Codex, lorsqu’il est disponible. Le choix « Par défaut » utilise le modèle configuré par Codex.',
+                      'Models come from the local Codex catalog when available. Default uses the model configured by Codex.',
                     )
                   : L(
                       'Les modèles proposés sont récupérés depuis votre compte Copilot. Une offre autorisant Copilot CLI est nécessaire.',
                       'Suggested models are retrieved from your Copilot account. A plan allowing Copilot CLI is required.',
                     )}
+              </p>
+              <label>
+                {L('Effort de raisonnement', 'Reasoning effort')}
+                <select
+                  aria-label={L('Effort de raisonnement', 'Reasoning effort')}
+                  value={draft.reasoningEffort ?? 'default'}
+                  onChange={(e) =>
+                    update('reasoningEffort', e.target.value as Settings['reasoningEffort'])
+                  }
+                >
+                  <option value="default">{L('Par défaut du modèle', 'Model default')}</option>
+                  <option value="low">Low — {L('rapide', 'fast')}</option>
+                  <option value="medium">Medium — {L('équilibré', 'balanced')}</option>
+                  <option value="high">High — {L('approfondi', 'thorough')}</option>
+                </select>
+              </label>
+              <p className="note">
+                {L(
+                  'Low / medium / high règlent le temps de réflexion, pas le modèle. Un effort élevé peut augmenter la durée et la consommation. Les niveaux acceptés dépendent du modèle ; laissez « Par défaut » en cas de doute. Enregistrez pour appliquer ces choix aux prochaines demandes.',
+                  'Low / medium / high set reasoning effort, not the model. Higher effort can increase duration and usage. Accepted levels depend on the model; use Default when unsure. Save to apply these choices to upcoming requests.',
+                )}
               </p>
               <div className="notice">
                 <ShieldCheck size={18} />
@@ -545,6 +1042,22 @@ export function SettingsModal({
                   'Android USB and emulator: ADB. iOS Simulator: Xcode. USB iPhone: Xcode and signed WebDriverAgent.',
                 )}
               </p>
+              <div
+                className="device-settings-tabs"
+                role="tablist"
+                aria-label={L('Plateforme mobile', 'Mobile platform')}
+              >
+                {(['ios', 'android'] as const).map((os) => (
+                  <button
+                    key={os}
+                    role="tab"
+                    aria-selected={deviceTab === os}
+                    onClick={() => setDeviceTab(os)}
+                  >
+                    {os === 'ios' ? 'iOS' : 'Android'}
+                  </button>
+                ))}
+              </div>
               <label>
                 Appium
                 <input
@@ -552,45 +1065,160 @@ export function SettingsModal({
                   onChange={(e) => update('appiumUrl', e.target.value)}
                 />
               </label>
-              <label>
-                {L('Équipe Apple (Team ID)', 'Apple Team ID')}
-                <input
-                  value={draft.iosTeamId}
-                  onChange={(e) => update('iosTeamId', e.target.value.trim())}
-                  placeholder="3ZL6…"
-                />
-              </label>
-              <label>
-                WebDriverAgent Bundle ID
-                <input
-                  value={draft.iosWdaBundleId}
-                  onChange={(e) => update('iosWdaBundleId', e.target.value.trim())}
-                />
-              </label>
-              <p className="note">
-                {L(
-                  'Appium démarre automatiquement sur le port local configuré. iOS physique nécessite un compte Apple dans Xcode et un profil de développement autorisant cet iPhone. Les réglages de tunnel ci-dessous servent de secours au miroir.',
-                  'Appium starts automatically on the configured local port. Physical iOS needs an Apple account in Xcode and a development profile allowing this iPhone. Tunnel settings below are a mirroring fallback.',
-                )}
-              </p>
-              <label>
-                {L('UDID de l’iPhone associé au tunnel', 'iPhone UDID associated with the tunnel')}
-                <input
-                  value={draft.wdaDeviceId}
-                  onChange={(e) => update('wdaDeviceId', e.target.value.trim())}
-                  placeholder="000081…"
-                />
-              </label>
-              <label>
-                WebDriverAgent · iPhone
-                <input value={draft.wdaUrl} onChange={(e) => update('wdaUrl', e.target.value)} />
-              </label>
-              <p className="note">
-                {L(
-                  'Adresse HTTP locale du tunnel WebDriverAgent. Associez explicitement le tunnel à l’UDID de l’iPhone choisi. Le miroir utilise des captures PNG périodiques, pas un flux vidéo.',
-                  'Local HTTP address of the WebDriverAgent tunnel. Explicitly associate the tunnel with the selected iPhone UDID. Mirroring uses periodic PNG screenshots, not a video stream.',
-                )}
-              </p>
+              {deviceTab === 'ios' && (
+                <>
+                  <label className="check-row">
+                    <input
+                      type="checkbox"
+                      checked={draft.iosKeepAwake ?? false}
+                      onChange={(e) => update('iosKeepAwake', e.target.checked)}
+                    />
+                    {L(
+                      'Maintenir l’iPhone éveillé (expérimental)',
+                      'Keep iPhone awake (experimental)',
+                    )}
+                  </label>
+                  <p className="note">
+                    {L(
+                      'Désactivé par défaut. Sur l’iPhone physique sélectionné et connecté à WDA, Cyberfox essaie un appui volume + puis − toutes les 20 secondes. Cela peut afficher l’indicateur et modifier légèrement le volume, notamment à ses limites. Suspendu pendant les tests et les commandes mobiles ; actif pendant l’attente IA. Ne déverrouille pas l’iPhone, ne modifie pas le profil d’entreprise et ne garantit pas d’empêcher sa veille. Enregistrez pour activer.',
+                      'Off by default. On the selected physical iPhone connected to WDA, Cyberfox tries volume up then down every 20 seconds. This may display the volume indicator and slightly change volume, especially at its limits. Paused during tests and mobile commands; active while waiting for AI. It does not unlock the iPhone, alter company profiles or guarantee prevention of sleep. Save to enable.',
+                    )}
+                  </p>
+                  <label>
+                    {L('Mode WebDriverAgent', 'WebDriverAgent mode')}
+                    <select
+                      value={draft.iosWdaMode ?? 'build'}
+                      onChange={(e) =>
+                        update('iosWdaMode', e.target.value as Settings['iosWdaMode'])
+                      }
+                    >
+                      <option value="build">
+                        {L('Compiler et signer sur ce Mac', 'Build and sign on this Mac')}
+                      </option>
+                      <option value="preinstalled">
+                        {L('WDA déjà installé et signé', 'WDA already installed and signed')}
+                      </option>
+                      <option value="external">
+                        {L(
+                          'WDA déjà lancé (adresse externe)',
+                          'WDA already running (external URL)',
+                        )}
+                      </option>
+                    </select>
+                  </label>
+                  <label>
+                    {L('Équipe Apple (Team ID)', 'Apple Team ID')}
+                    <input
+                      value={draft.iosTeamId}
+                      onChange={(e) => update('iosTeamId', e.target.value.trim())}
+                      placeholder="3ZL6…"
+                    />
+                  </label>
+                  <label>
+                    {L(
+                      'Bundle ID de base WDA (distinct de l’app TestFlight)',
+                      'WDA base Bundle ID (separate from the TestFlight app)',
+                    )}
+                    <input
+                      placeholder="com.pickywawa.cyberfox.WebDriverAgentRunner"
+                      value={draft.iosWdaBundleId}
+                      onChange={(e) => update('iosWdaBundleId', e.target.value.trim())}
+                    />
+                  </label>
+                  <p className="note">
+                    {L('Identifiant final du runner : ', 'Final runner identifier: ')}
+                    <code>
+                      {draft.iosWdaBundleId
+                        ? draft.iosWdaBundleId + '.xctrunner'
+                        : '…WebDriverAgentRunner.xctrunner'}
+                    </code>
+                    <br />
+                    {L(
+                      'Cet identifiant doit être autorisé par le profil Development de votre équipe. Le nom d’exemple com.pickywawa… n’est pas un profil fourni avec Cyberfox.',
+                      'This identifier must be allowed by your team’s Development profile. The example com.pickywawa… is not a profile supplied with Cyberfox.',
+                    )}
+                  </p>
+                  <label>
+                    {L(
+                      'Fichier .xcconfig de signature (facultatif, profil match)',
+                      'Signing .xcconfig file (optional, match profile)',
+                    )}
+                    <input
+                      value={draft.iosXcodeConfigFile ?? ''}
+                      onChange={(e) => update('iosXcodeConfigFile', e.target.value)}
+                      placeholder="/chemin/vers/wda.xcconfig"
+                    />
+                  </label>
+                  <button
+                    disabled={!iosDeviceId}
+                    onClick={async () => {
+                      try {
+                        await api.openWdaProject(iosDeviceId!);
+                      } catch (e) {
+                        setError(String(e));
+                      }
+                    }}
+                  >
+                    {L('Ouvrir le projet WDA dans Xcode', 'Open WDA project in Xcode')}
+                  </button>
+                  <p className="note">
+                    {L(
+                      'Sélectionnez un iPhone dans le projet. Dans Xcode : target WebDriverAgentRunner → Signing & Capabilities ; choisir l’équipe et le profil puis Product → Test sur cet iPhone. Enregistrer les réglages Cyberfox avant de reconnecter.',
+                      'Select an iPhone in the project. In Xcode: WebDriverAgentRunner target → Signing & Capabilities; choose team and profile, then Product → Test on this iPhone. Save Cyberfox settings before reconnecting.',
+                    )}
+                  </p>
+                  <p className="note">
+                    {L(
+                      'Appium démarre automatiquement sur le port local configuré. iOS physique nécessite un compte Apple dans Xcode et un profil de développement autorisant cet iPhone. Les réglages de tunnel ci-dessous servent de secours au miroir.',
+                      'Appium starts automatically on the configured local port. Physical iOS needs an Apple account in Xcode and a development profile allowing this iPhone. Tunnel settings below are a mirroring fallback.',
+                    )}
+                  </p>
+                  <label>
+                    {L(
+                      'UDID de l’iPhone associé au tunnel',
+                      'iPhone UDID associated with the tunnel',
+                    )}
+                    <input
+                      value={draft.wdaDeviceId}
+                      onChange={(e) => update('wdaDeviceId', e.target.value.trim())}
+                      placeholder="000081…"
+                    />
+                  </label>
+                  <label>
+                    {L(
+                      'Version iOS (requise sous Windows/Linux)',
+                      'iOS version (required on Windows/Linux)',
+                    )}
+                    <input
+                      value={draft.iosPlatformVersion ?? ''}
+                      onChange={(e) => update('iosPlatformVersion', e.target.value)}
+                      placeholder="27.0.1"
+                    />
+                  </label>
+                  <label>
+                    WebDriverAgent · iPhone
+                    <input
+                      value={draft.wdaUrl}
+                      onChange={(e) => update('wdaUrl', e.target.value)}
+                    />
+                  </label>
+                  <p className="note">
+                    {L(
+                      'Adresse HTTP locale du tunnel WebDriverAgent. Associez explicitement le tunnel à l’UDID de l’iPhone choisi. Le miroir utilise des captures PNG périodiques, pas un flux vidéo.',
+                      'Local HTTP address of the WebDriverAgent tunnel. Explicitly associate the tunnel with the selected iPhone UDID. Mirroring uses periodic PNG screenshots, not a video stream.',
+                    )}
+                  </p>
+                  {deviceTab === 'ios' && <DeviceSetup L={L} />}
+                </>
+              )}
+              {deviceTab === 'android' && (
+                <p className="note">
+                  {L(
+                    'Aucun paramètre spécifique Android pour le moment. La connexion utilise ADB et UiAutomator2.',
+                    'No Android-specific settings yet. Connection uses ADB and UiAutomator2.',
+                  )}
+                </p>
+              )}
               <div className="notice">
                 <Usb size={18} />
                 {L(

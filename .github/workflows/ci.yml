@@ -14,6 +14,7 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - run: npm run test:site
   mac-package:
     runs-on: macos-15
     steps:
@@ -26,3 +27,4 @@ jobs:
       - name: Build and verify the signed macOS application
         run: npm run dist -- --mac dir
       - run: npm run test:package:mac
+      - run: npm run test:package:appium

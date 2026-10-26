@@ -52,11 +52,29 @@ export function ScenarioTree({
   const [closed, setClosed] = useState(new Set<string>());
   return (
     <div className="tree" role={depth === 0 ? 'tree' : 'group'}>
-      {nodes.map((n) => {
+      {nodes.map((n, index) => {
         const Icon = nodeIcons[n.kind];
         const open = !closed.has(n.id);
+        const entry = report?.entries
+          .filter((entry) => entry.nodeId === n.id && !entry.precondition)
+          .at(-1);
+        const previous = report?.entries
+          .filter((entry) => entry.nodeId === nodes[index - 1]?.id && !entry.precondition)
+          .at(-1);
+        const observedScreen = n.kind === 'navigation' ? entry?.screenAfter : entry?.screenBefore;
+        const screen =
+          n.screen?.name ?? (observedScreen?.identified ? observedScreen.name : undefined);
+        const previousScreen =
+          nodes[index - 1]?.screen?.name ??
+          (previous?.screenAfter?.identified ? previous.screenAfter.name : undefined) ??
+          (previous?.screenBefore?.identified ? previous.screenBefore.name : undefined);
         return (
           <div key={n.id}>
+            {screen && screen !== previousScreen && (
+              <div className="tree-screen-label" style={{ paddingLeft: 12 + depth * 15 }}>
+                {screen}
+              </div>
+            )}
             <div
               className={`tree-row ${selected === n.id ? 'selected' : ''} state-${nodeStatus(report, n.id) ?? 'idle'} ${proposed?.has(n.id) ? 'proposed' : ''}`}
               style={{ paddingLeft: 8 + depth * 15 }}
@@ -84,7 +102,7 @@ export function ScenarioTree({
                 <Icon size={16} className={n.kind} />
                 <span>{n.name}</span>
               </button>
-              {onRun && n.kind === 'scenario' && (
+              {onRun && (
                 <button
                   className="tree-control"
                   aria-label={'Exécuter ' + n.name}

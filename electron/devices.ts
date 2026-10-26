@@ -19,7 +19,12 @@ export function parseAdb(text: string): Device[] {
           id: `android:${id}`,
           name: model ?? id,
           platform: 'android' as const,
-          kind: id.startsWith('emulator-') ? ('simulator' as const) : ('usb' as const),
+          kind: id.startsWith('emulator-')
+            ? ('simulator' as const)
+            : rest.some((s) => s.startsWith('usb:')) ||
+                (!id.includes(':') && !id.startsWith('adb-'))
+              ? ('usb' as const)
+              : ('network' as const),
           status: status === 'device' ? ('ready' as const) : (status as 'unauthorized' | 'offline'),
           detail: status === 'unauthorized' ? 'Autoriser le débogage USB sur le téléphone' : id,
         },
@@ -28,7 +33,9 @@ export function parseAdb(text: string): Device[] {
 }
 export class Devices {
   known = new Map<string, Device>();
-  constructor(private wdaConfig: () => { url: string; udid: string }) {}
+  constructor(
+    private wdaConfig: () => { url: string; udid: string; mode?: string; platformVersion?: string },
+  ) {}
   async scan(): Promise<DeviceScan> {
     const devices: Device[] = [];
     const diagnostics: string[] = [];
@@ -78,11 +85,22 @@ export class Devices {
               if (d.hardwareProperties?.reality !== 'physical') continue;
               const udid = d.hardwareProperties.udid;
               if (!udid) continue;
+              if (d.deviceProperties?.developerModeStatus !== 'enabled')
+                diagnostics.push(
+                  `${d.deviceProperties.name} : activer le mode développeur sur l’iPhone.`,
+                );
+              if (d.deviceProperties?.ddiServicesAvailable === false)
+                diagnostics.push(
+                  `${d.deviceProperties.name} : services développeur iOS (DDI) indisponibles. Ouvrir Xcode → Window → Devices and Simulators et terminer la préparation de l’iPhone.`,
+                );
               devices.push({
                 id: 'ios:' + udid,
                 name: d.deviceProperties.name,
+                osVersion: d.deviceProperties.osVersionNumber,
+                developerMode: d.deviceProperties.developerModeStatus,
+                ddiReady: d.deviceProperties.ddiServicesAvailable,
                 platform: 'ios',
-                kind: 'usb',
+                kind: d.connectionProperties?.transportType === 'wired' ? 'usb' : 'network',
                 status:
                   d.connectionProperties?.pairingState === 'paired' &&
                   d.deviceProperties?.bootState === 'booted'
@@ -99,6 +117,18 @@ export class Devices {
         })(),
       );
     await Promise.all(tasks);
+    const config = this.wdaConfig();
+    if (process.platform !== 'darwin' && config.udid && config.mode && config.mode !== 'build') {
+      devices.push({
+        id: 'ios:' + config.udid,
+        name: 'iPhone · ' + config.udid,
+        platform: 'ios',
+        kind: 'manual',
+        status: 'ready',
+        osVersion: config.platformVersion,
+        detail: 'Configuration manuelle · connexion à vérifier',
+      });
+    }
     this.known = new Map(devices.map((d) => [d.id, d]));
     return { devices, diagnostics };
   }
@@ -123,7 +153,9 @@ export class Devices {
       // WDA does not report its physical UDID; require explicit user association to this tunnel.
       const config = this.wdaConfig();
       if (config.udid !== id.slice(4))
-        throw new Error('Associer l’UDID de cet iPhone au tunnel dans Paramètres → Appareils.');
+        throw new Error(
+          'Le miroir iOS nécessite WebDriverAgent. Attendez la connexion automatique ou utilisez Reconnecter. Si elle échoue, vérifiez Xcode et la signature WebDriverAgent dans Cyberfox → Paramètres → Appareils. Un tunnel manuel doit être associé au bon UDID.',
+        );
       const base = config.url.replace(/\/$/, '');
       const status = (await fetch(`${base}/status`, { signal: AbortSignal.timeout(5000) }).then(
         (r) => r.json(),

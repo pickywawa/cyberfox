@@ -66,6 +66,8 @@ async function runnerFixture(fn: (context: any) => Promise<void>) {
     await store.load();
     await store.saveSettings({ ...store.state.settings, analysisMode: 'off' });
     const p = await store.create({ name: 'QA', platforms: ['android', 'ios'] });
+    const campaign = await store.createCampaign({ projectId: p.id });
+    p.activeCampaignId = campaign.id;
     const calls: string[] = [];
     const events: LiveEvent[] = [];
     let active = 0,
@@ -137,7 +139,10 @@ test('parallel OS execution continues after nonblocking failures and preserves f
     assert.ok(calls.includes('ios:2:pass'));
     assert.equal(parallel(), 2);
     const persisted = JSON.parse(
-      await readFile(path.join(p.directory, 'reports', started.id + '.json'), 'utf8'),
+      await readFile(
+        path.join(p.directory, 'campaigns', p.activeCampaignId!, 'reports', started.id + '.json'),
+        'utf8',
+      ),
     );
     assert.equal(persisted.status, 'failed');
   }));
@@ -245,3 +250,147 @@ test('real WebDriver protocol waits for semantic assertion and taps an element r
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+test('iOS exposes empty unnamed input fields without inventing identifiers or indexed selectors', () => {
+  for (const role of ['TextField', 'SecureTextField', 'TextView', 'SearchField']) {
+    const type = `XCUIElementType${role}`;
+    const field = `<${type} type="${type}" name="" label="" value="" visible="true" enabled="true" x="20" y="100" width="200" height="44"/>`;
+    const screen = parseScreen(`<App>${field}</App>`, 'ios:1');
+    assert.equal(screen.components.length, 1);
+    assert.deepEqual(screen.components[0].locator, {
+      using: 'xpath',
+      value: ['TextField', 'SecureTextField'].includes(role)
+        ? '//*[self::XCUIElementTypeTextField or self::XCUIElementTypeSecureTextField]'
+        : `//${type}`,
+    });
+    assert.equal(screen.components[0].password, role === 'SecureTextField');
+    const repeated = parseScreen(`<App>${field}${field}</App>`, 'ios:1');
+    assert.equal(repeated.components.length, 2);
+    assert.deepEqual(repeated.components[0].locator, repeated.components[1].locator);
+  }
+  const hidden = parseScreen(
+    '<App><XCUIElementTypeTextField visible="false" x="0" y="0" width="100" height="44"/></App>',
+    'ios:1',
+  );
+  assert.equal(hidden.components.length, 0);
+});
+
+test('iOS distinguishes a button from its text sharing the same accessibility name without indexed selectors', () => {
+  const screen = parseScreen(
+    '<App><XCUIElementTypeButton type="XCUIElementTypeButton" name="Me connecter" x="10" y="10" width="100" height="40"><XCUIElementTypeStaticText type="XCUIElementTypeStaticText" name="Me connecter" x="10" y="10" width="100" height="40"/></XCUIElementTypeButton><XCUIElementTypeTextField type="XCUIElementTypeTextField" name="Identifiant" x="0" y="60" width="100" height="40"/></App>',
+    'ios:1',
+  );
+  assert.equal(screen.components.length, 3);
+  assert.deepEqual(screen.components[0].locator, {
+    using: 'xpath',
+    value: "//XCUIElementTypeButton[@name='Me connecter']",
+  });
+  assert.deepEqual(screen.components[1].locator, {
+    using: 'xpath',
+    value: "//XCUIElementTypeStaticText[@name='Me connecter']",
+  });
+  assert.notEqual(screen.components[0].id, screen.components[1].id);
+  assert.equal(screen.components[2].locator?.using, 'accessibility id');
+  const repeated = parseScreen(
+    '<App><Button type="XCUIElementTypeButton" name="A" x="0" y="0" width="10" height="10"/><Button type="XCUIElementTypeButton" name="A" x="0" y="20" width="10" height="10"/></App>',
+    'ios:1',
+  );
+  assert.equal(repeated.components[0].locator?.value, repeated.components[1].locator?.value); // Still ambiguous; execution must reject multiple matches.
+});
+
+test('Flutter caret and unfocused input share a stable selector while named fields keep their ID', () => {
+  const plain = parseScreen(
+    '<App><XCUIElementTypeTextField x="0" y="0" width="100" height="40"/></App>',
+    'ios:1',
+  );
+  const focused = parseScreen(
+    '<App><XCUIElementTypeSecureTextField name="|" value="|" x="0" y="0" width="100" height="40"/></App>',
+    'ios:1',
+  );
+  assert.deepEqual(focused.components[0].locator, plain.components[0].locator);
+  const named = parseScreen(
+    '<App><XCUIElementTypeSecureTextField name="pin-input" x="0" y="0" width="100" height="40"/></App>',
+    'ios:1',
+  );
+  assert.deepEqual(named.components[0].locator, { using: 'accessibility id', value: 'pin-input' });
+});
+
+for (const replacement of ['focus', 'clear']) {
+  test(`iOS typing survives input replacement during ${replacement} and sends the secret once`, async () => {
+    const { createServer } = await import('node:http');
+    const { Automation, IOS_ANONYMOUS_INPUT_SELECTOR } = await import('../electron/automation.js');
+    const { settingsSchema } = await import('../shared/model.js');
+    let focused = false;
+    let ambiguous = false;
+    const writes: any[] = [];
+    const server = createServer(async (req, res) => {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      let value: any = {};
+      const key = 'element-6066-11e4-a52e-4f735466cecf';
+      if (req.url === '/status') value = { ready: true };
+      else if (req.url === '/session') value = { sessionId: 'session' };
+      else if (req.url?.endsWith('/elements'))
+        value = ambiguous
+          ? [{ [key]: 'a' }, { [key]: 'b' }]
+          : [{ [key]: focused ? 'secure' : 'plain' }];
+      else if (req.url?.endsWith('/rect')) value = { x: 0, y: 0, width: 100, height: 40 };
+      else if (req.url?.endsWith('/source'))
+        value = '<App><XCUIElementTypeTextField x="0" y="0" width="100" height="40"/></App>';
+      else if (req.url?.endsWith(replacement === 'focus' ? '/plain/click' : '/plain/clear')) {
+        focused = true;
+        res.statusCode = 404;
+        value = { error: 'stale element reference', message: 'Input replaced on focus' };
+      } else if (req.url?.endsWith('/value'))
+        writes.push({ route: req.url, body: JSON.parse(body) });
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ value }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const settings = settingsSchema.parse({
+      appiumUrl: `http://127.0.0.1:${(server.address() as any).port}`,
+      theme: 'dark',
+      language: 'fr',
+      projectsDirectory: '/tmp',
+      provider: 'codex',
+      codexModel: '',
+      copilotModel: '',
+      wdaUrl: 'http://127.0.0.1:8100',
+      iosWdaMode: 'external',
+      iosPlatformVersion: '18.0',
+      wdaDeviceId: '1',
+    });
+    const automation = new Automation(
+      () => ({
+        id: 'sim:1',
+        platform: 'ios',
+        status: 'ready',
+        kind: 'usb',
+        name: 'iPhone',
+        detail: '',
+      }),
+      () => settings,
+      () => {},
+    );
+    try {
+      const variant = variantSchema.parse({
+        operation: 'type',
+        locator: { using: 'xpath', value: IOS_ANONYMOUS_INPUT_SELECTOR },
+        value: '${PIN}',
+      });
+      await automation.perform('sim:1', variant, 'action', undefined, undefined, { PIN: '4444' });
+      assert.deepEqual(writes, [
+        { route: '/session/session/element/secure/value', body: { text: '4444' } },
+      ]);
+      ambiguous = true;
+      await assert.rejects(
+        automation.perform('sim:1', variant, 'action', undefined, undefined, { PIN: '4444' }),
+        /Sélecteur ambigu/,
+      );
+      assert.equal(writes.length, 1);
+    } finally {
+      await automation.stop();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+}

@@ -67,6 +67,26 @@ export function ProposalDialog({
         </div>
         <span className="badge">+{proposed.size}</span>
       </div>
+      {reply.replay && (
+        <div className="notice">
+          <div>
+            <b>{L('Vérification par rejeu', 'Replay verification')}</b>
+            {reply.replay.map((result) => (
+              <p key={result.platform}>
+                <b>{result.platform === 'ios' ? 'iOS' : 'Android'}</b> ·{' '}
+                {result.status === 'passed'
+                  ? L('Réussi', 'Passed')
+                  : result.status === 'failed'
+                    ? L('Échec', 'Failed')
+                    : result.status === 'blocked'
+                      ? L('Bloqué', 'Blocked')
+                      : L('Non exécuté', 'Skipped')}{' '}
+                — {result.message}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="proposal-workspace">
         <div className="proposal-tree">
           <ScenarioTree

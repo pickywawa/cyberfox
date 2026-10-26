@@ -1,9 +1,16 @@
+import { migrateIosCaretInputs } from '../shared/ios-input.js';
+import { validateScreenDefinitions } from './screen-identity.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
+  applicationsSchema,
+  applicationDetailsSchema,
+  campaignSchema,
   nodeSchema,
+  variablesSchema,
+  chatSessionSchema,
   migrateProject,
   validateTree,
   projectInput,
@@ -14,10 +21,16 @@ import {
 } from '../shared/model.js';
 const projectSchema = z.object({
   id: z.string(),
-  name: z.string(),
+  name: projectInput.shape.name,
   directory: z.string(),
   platforms: projectInput.shape.platforms,
-  tab: z.enum(['creation', 'execution']),
+  tab: z.enum(['creation', 'execution', 'variables']),
+  applicationDetails: applicationDetailsSchema.default({}),
+  applications: applicationsSchema.default({ android: '', ios: '' }),
+  variables: variablesSchema.default({}),
+  chatSessions: z.array(chatSessionSchema).default([]),
+  activeCampaignId: z.string().uuid().nullable().default(null),
+  activeChatSessionId: z.string().nullable().default(null),
   nodes: z.array(nodeSchema),
   selectedNodeId: z.string().nullable().default(null),
   tags: z.array(z.string()).default([]),
@@ -27,6 +40,7 @@ const projectSchema = z.object({
     z.object({
       id: z.string(),
       role: z.enum(['user', 'assistant']),
+      sessionId: z.string().optional(),
       content: z.string(),
       at: z.string(),
     }),
@@ -140,6 +154,11 @@ export class Store {
         id: randomUUID(),
         directory,
         tab: 'creation',
+        variables: {},
+        chatSessions: [
+          { id: randomUUID(), name: 'Session 1', createdAt: new Date().toISOString() },
+        ],
+        activeChatSessionId: null,
         tags: [],
         revision: 0,
         selectedNodeId: null,
@@ -148,6 +167,7 @@ export class Store {
         messages: [],
         createdAt: new Date().toISOString(),
       };
+      project.activeChatSessionId = project.chatSessions[0].id;
       const previous = this.state.activeProjectId;
       try {
         await this.atomic(path.join(directory, 'cyberfox.project.json'), project);
@@ -192,11 +212,187 @@ export class Store {
         .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0] ?? null
     );
   }
-  async saveReport(report: import('../shared/model.js').RunReport) {
-    const project = this.get(report.projectId);
-    const directory = path.join(project.directory, 'reports');
+  private campaignDirectory(projectId: string, campaignId: string) {
+    z.string().uuid().parse(campaignId);
+    return path.join(this.get(projectId).directory, 'campaigns', campaignId);
+  }
+  async listCampaigns(projectId: string): Promise<import('../shared/model.js').Campaign[]> {
+    const directory = path.join(this.get(projectId).directory, 'campaigns');
+    const files = await fs.readdir(directory).catch((error) => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    });
+    const campaigns = await Promise.all(
+      files
+        .filter((id) => z.string().uuid().safeParse(id).success)
+        .map(async (id) => {
+          const campaign = campaignSchema.parse(
+            JSON.parse(await fs.readFile(path.join(directory, id, 'campaign.json'), 'utf8')),
+          );
+          if (campaign.projectId !== projectId || campaign.id !== id)
+            throw new Error('Campagne incohérente');
+          return campaign;
+        }),
+    );
+    return campaigns.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+  async createCampaign(input: { projectId: string; label?: string }) {
+    const campaign = campaignSchema.parse({
+      id: randomUUID(),
+      projectId: input.projectId,
+      label: input.label || 'Campagne ' + new Date().toLocaleString('fr-FR'),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: 'open',
+    });
+    await this.transaction(async () => {
+      const directory = this.campaignDirectory(input.projectId, campaign.id);
+      await fs.mkdir(directory, { recursive: true });
+      await this.atomic(path.join(directory, 'campaign.json'), campaign);
+    });
+    await this.update({ id: input.projectId, activeCampaignId: campaign.id });
+    return campaign;
+  }
+  async loadCampaign(
+    projectId: string,
+    campaignId: string,
+  ): Promise<import('../shared/model.js').CampaignDetail> {
+    const directory = this.campaignDirectory(projectId, campaignId);
+    const campaign = campaignSchema.parse(
+      JSON.parse(await fs.readFile(path.join(directory, 'campaign.json'), 'utf8')),
+    );
+    if (campaign.projectId !== projectId || campaign.id !== campaignId)
+      throw new Error('Campagne incohérente');
+    const files = await fs.readdir(path.join(directory, 'reports')).catch((error) => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    });
+    const reports = await Promise.all(
+      files
+        .filter((file) => /^[a-zA-Z0-9-]+\.json$/.test(file))
+        .map(async (file) => {
+          const report = JSON.parse(
+            await fs.readFile(path.join(directory, 'reports', file), 'utf8'),
+          ) as import('../shared/model.js').RunReport;
+          if (
+            report.projectId !== projectId ||
+            report.campaignId !== campaignId ||
+            report.id + '.json' !== file ||
+            !Array.isArray(report.entries)
+          )
+            throw new Error('Rapport incohérent');
+          return report;
+        }),
+    );
+    return { campaign, reports: reports.sort((a, b) => a.startedAt.localeCompare(b.startedAt)) };
+  }
+  updateCampaign(input: {
+    projectId: string;
+    campaignId: string;
+    label?: string;
+    status?: 'open' | 'completed';
+  }) {
+    return this.transaction(async () => {
+      const { campaign } = await this.loadCampaign(input.projectId, input.campaignId);
+      const next = campaignSchema.parse({
+        ...campaign,
+        ...(input.label !== undefined ? { label: input.label } : {}),
+        ...(input.status ? { status: input.status } : {}),
+        updatedAt: new Date().toISOString(),
+      });
+      await this.atomic(
+        path.join(this.campaignDirectory(input.projectId, input.campaignId), 'campaign.json'),
+        next,
+      );
+      return next;
+    });
+  }
+  async cleanCampaigns(projectId: string, campaignId?: string) {
+    await this.transaction(async () => {
+      const campaigns = campaignId
+        ? [(await this.loadCampaign(projectId, campaignId)).campaign]
+        : await this.listCampaigns(projectId);
+      for (const campaign of campaigns) {
+        const directory = this.campaignDirectory(projectId, campaign.id);
+        await fs.rm(path.join(directory, 'reports'), { recursive: true, force: true });
+        await fs.rm(path.join(directory, 'captures'), { recursive: true, force: true });
+        await this.atomic(path.join(directory, 'campaign.json'), {
+          ...campaign,
+          status: 'open',
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    });
+  }
+  private reportDirectory(projectId: string, campaignId?: string) {
+    return campaignId
+      ? path.join(this.campaignDirectory(projectId, campaignId), 'reports')
+      : path.join(this.get(projectId).directory, 'reports');
+  }
+  async saveCapture(
+    report: import('../shared/model.js').RunReport,
+    entryId: string,
+    image: string,
+  ) {
+    z.string().uuid().parse(report.id);
+    z.string().uuid().parse(entryId);
+    if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(image))
+      throw new Error('Format de capture invalide');
+    const directory = path.join(
+      this.reportDirectory(report.projectId, report.campaignId),
+      '..',
+      'captures',
+    );
     await fs.mkdir(directory, { recursive: true });
-    await this.atomic(path.join(directory, report.id + '.json'), report);
+    const file = report.id + '-' + entryId + '.png';
+    try {
+      await fs.writeFile(path.join(directory, file), Buffer.from(image.slice(22), 'base64'), {
+        flag: 'wx',
+        mode: 0o600,
+      });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+    return 'capture:' + file;
+  }
+  async saveReport(report: import('../shared/model.js').RunReport) {
+    const directory = this.reportDirectory(report.projectId, report.campaignId);
+    z.string().uuid().parse(report.id);
+    await fs.mkdir(directory, { recursive: true });
+    const copy = structuredClone(report);
+    for (const entry of copy.entries) {
+      if (!entry.screenshot?.startsWith('data:image/png;base64,')) continue;
+      entry.screenshot = await this.saveCapture(report, entry.id, entry.screenshot);
+    }
+    await this.atomic(path.join(directory, report.id + '.json'), copy);
+  }
+  async reportScreenshot(input: {
+    projectId: string;
+    campaignId?: string;
+    runId: string;
+    entryId: string;
+  }) {
+    z.string().uuid().parse(input.runId);
+    z.string().uuid().parse(input.entryId);
+    const directory = this.reportDirectory(input.projectId, input.campaignId);
+    try {
+      const buffer = await fs.readFile(
+        path.join(directory, '..', 'captures', input.runId + '-' + input.entryId + '.png'),
+      );
+      return 'data:image/png;base64,' + buffer.toString('base64');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    const report = JSON.parse(
+      await fs.readFile(path.join(directory, input.runId + '.json'), 'utf8'),
+    ) as import('../shared/model.js').RunReport;
+    const entry = report.entries.find((entry) => entry.id === input.entryId);
+    if (entry?.screenshot?.startsWith('data:image/png;base64,')) return entry.screenshot;
+    if (entry?.screenshot !== 'capture:' + input.runId + '-' + input.entryId + '.png') return null;
+    const buffer = await fs.readFile(
+      path.join(directory, '..', 'captures', input.runId + '-' + input.entryId + '.png'),
+    );
+    return 'data:image/png;base64,' + buffer.toString('base64');
   }
   select(id: string) {
     return this.transaction(async () => {
@@ -213,10 +409,18 @@ export class Store {
   }
   update(input: {
     id: string;
+    name?: string;
+    platforms?: Project['platforms'];
+    applicationDetails?: Project['applicationDetails'];
+    applications?: Project['applications'];
     tab?: Project['tab'];
     nodes?: Project['nodes'];
     messages?: Project['messages'];
     tags?: string[];
+    variables?: Project['variables'];
+    chatSessions?: Project['chatSessions'];
+    activeCampaignId?: string | null;
+    activeChatSessionId?: string | null;
     deviceIds?: Project['deviceIds'];
     expectedRevision?: number;
     selectedNodeId?: string | null;
@@ -228,10 +432,21 @@ export class Store {
       const next = projectSchema.parse({
         ...current,
         ...input,
+        nodes: migrateIosCaretInputs(input.nodes ?? current.nodes),
         deviceIds: { ...current.deviceIds, ...input.deviceIds },
-        revision: current.revision + (input.nodes || input.tags ? 1 : 0),
+        revision:
+          current.revision +
+          (input.nodes || input.tags || input.platforms || input.applications ? 1 : 0),
       });
+      if (
+        next.activeChatSessionId &&
+        !next.chatSessions.some((session) => session.id === next.activeChatSessionId)
+      )
+        throw new Error('Session IA introuvable');
+      if (new Set(next.chatSessions.map((session) => session.id)).size !== next.chatSessions.length)
+        throw new Error('Sessions IA dupliquées');
       validateTree(next.nodes);
+      validateScreenDefinitions(next.nodes);
       next.tags = [
         ...new Set([
           ...next.tags,
@@ -251,7 +466,15 @@ export class Store {
       };
       check(next.nodes);
       await this.atomic(path.join(current.directory, 'cyberfox.project.json'), next);
-      this.state.projects[this.state.projects.indexOf(current)] = next;
+      const index = this.state.projects.indexOf(current);
+      this.state.projects[index] = next;
+      try {
+        if (input.name !== undefined) await this.persist();
+      } catch (error) {
+        this.state.projects[index] = current;
+        await this.atomic(path.join(current.directory, 'cyberfox.project.json'), current);
+        throw error;
+      }
       return next;
     });
   }

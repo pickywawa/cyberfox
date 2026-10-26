@@ -33,7 +33,9 @@ try {
   await page.getByLabel('Nom', { exact: true }).fill('Profil visible');
   await page.getByLabel('Description facultative').click();
   await page.getByRole('tab', { name: 'Exécution' }).click();
-  await expect(page.getByRole('heading', { name: 'Prêt à vérifier' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Campagnes de test' })).toBeVisible();
+  await page.getByRole('button', { name: 'Lancer une nouvelle campagne de test' }).click();
+  await expect(page.locator('.campaign-title')).toBeVisible();
   const saved = JSON.parse(
     await readFile(
       path.join(temporary, 'projects', 'Smoke mobile', 'cyberfox.project.json'),
@@ -41,12 +43,40 @@ try {
     ),
   );
   expect(saved.tab).toBe('execution');
+  expect(saved.activeCampaignId).toBeTruthy();
+  const campaigns = await page.evaluate(async (id) => window.cyberfox.campaignList(id), saved.id);
+  expect(campaigns.length).toBe(1);
+  const createdAt = campaigns[0].createdAt;
+  await page.evaluate(async (input) => window.cyberfox.campaignUpdate(input), {
+    projectId: saved.id,
+    campaignId: saved.activeCampaignId,
+    label: 'Campagne persistante',
+  });
   expect(saved.nodes[0].name).toBe('Profil visible');
   await page.reload();
   await expect(page.getByRole('tab', { name: 'Exécution' })).toHaveAttribute(
     'aria-selected',
     'true',
   );
+  await expect(page.locator('.campaign-title')).toHaveText('Campagne persistante');
+  const restored = await page.evaluate(async (input) => window.cyberfox.campaignLoad(input), {
+    projectId: saved.id,
+    campaignId: saved.activeCampaignId,
+  });
+  expect(restored.campaign.createdAt).toBe(createdAt);
+  const text = await page.evaluate(async (input) => window.cyberfox.campaignExport(input), {
+    projectId: saved.id,
+    campaignId: saved.activeCampaignId,
+  });
+  expect(text).toContain('Campagne persistante');
+  expect(text).not.toContain('data:image');
+  await expect(page.locator('.chat-panel')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Nouveau projet', exact: true })).toHaveCount(0);
+  await app.evaluate(({ Menu }) =>
+    Menu.getApplicationMenu().getMenuItemById('new-project').click(),
+  );
+  await expect(page.getByRole('dialog', { name: 'Nouveau projet', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Annuler', exact: true }).click();
   const status = await page.evaluate(async () => {
     const b = window.cyberfox;
     const [codex, copilot, devices] = await Promise.all([

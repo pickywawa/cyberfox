@@ -1,3 +1,11 @@
+# Cyberfox 0.4.0
+
+Campagnes persistantes, progression compacte, cartographie, exports multiformats, création IA et variables à la volée, robustesse Flutter/iOS, diagnostic appareils et documentation bilingue.
+
+[Notes détaillées français / anglais](docs/releases/v0.4.0.md).
+
+---
+
 # Cyberfox 0.3.1
 
 ## Icône et paquet macOS

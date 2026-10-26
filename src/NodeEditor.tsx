@@ -40,6 +40,7 @@ export function NodeEditor({
       const next = { ...node };
       for (const key of [
         'name',
+        'screen',
         'description',
         'tags',
         'kind',
@@ -103,6 +104,14 @@ export function NodeEditor({
     });
   return (
     <div className="node-editor">
+      {Object.keys(project.variables ?? {}).length > 0 && (
+        <p className="note">
+          {L('Variables disponibles : ', 'Available variables: ')}
+          {Object.keys(project.variables)
+            .map((key) => '${' + key + '}')
+            .join(' · ')}
+        </p>
+      )}
       <div className="editor-title">
         <span className={'kind ' + node.kind}>
           <Icon size={14} />
@@ -136,6 +145,7 @@ export function NodeEditor({
                 const kind = e.target.value as ScenarioNode['kind'];
                 change({
                   kind,
+                  screen: kind === 'navigation' ? draft.screen : undefined,
                   variants: Object.fromEntries(
                     requiredOS(project).map((os) => [
                       os,
@@ -171,6 +181,93 @@ export function NodeEditor({
           />
         </label>
       </div>
+      {draft.kind === 'navigation' && (
+        <section className="navigation-screen-editor">
+          <h3>{L('Écran destination', 'Destination screen')}</h3>
+          <p className="muted">
+            {L(
+              'Une identité stable et des repères distinctifs identifient l’écran. Sélectionnez des composants de destination dans le miroir pour ajouter des repères.',
+              'A stable identity and distinctive markers identify the screen. Select destination components in the mirror to add markers.',
+            )}
+          </p>
+          <div className="editor-grid">
+            <label>
+              {L('Identifiant unique de l’écran', 'Unique screen identifier')}
+              <input
+                disabled={readOnly}
+                value={draft.screen?.id ?? ''}
+                placeholder="login"
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    screen: {
+                      id: event.target.value,
+                      name: draft.screen?.name ?? draft.name,
+                      variants: draft.screen?.variants ?? {},
+                    },
+                  })
+                }
+                onBlur={() => {
+                  if (draft.screen?.id.trim()) void change({ screen: draft.screen });
+                }}
+              />
+            </label>
+            <label>
+              {L('Nom de l’écran', 'Screen name')}
+              <input
+                disabled={readOnly}
+                value={draft.screen?.name ?? ''}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    screen: {
+                      id: draft.screen?.id || draft.id,
+                      name: event.target.value,
+                      variants: draft.screen?.variants ?? {},
+                    },
+                  })
+                }
+                onBlur={() => {
+                  if (draft.screen?.name.trim()) void change({ screen: draft.screen });
+                }}
+              />
+            </label>
+          </div>
+          {requiredOS(project).map((os) => (
+            <div key={os}>
+              <b>{os === 'ios' ? 'iOS' : 'Android'}</b>
+              {draft.screen?.variants[os]?.markers.map((marker, index) => (
+                <div className="screen-marker-row" key={index}>
+                  <code>
+                    {marker.using} · {marker.value}
+                  </code>
+                  {!readOnly && (
+                    <button
+                      onClick={() => {
+                        if (!draft.screen) return;
+                        const markers = draft.screen.variants[os]!.markers.filter(
+                          (_, i) => i !== index,
+                        );
+                        const variants = { ...draft.screen.variants };
+                        if (markers.length) variants[os] = { markers };
+                        else delete variants[os];
+                        void change({ screen: { ...draft.screen, variants } });
+                      }}
+                    >
+                      {L('Retirer', 'Remove')}
+                    </button>
+                  )}
+                </div>
+              ))}
+              {!draft.screen?.variants[os] && (
+                <p className="note">
+                  {L('Aucun repère configuré pour cet OS.', 'No markers configured for this OS.')}
+                </p>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
       <label>
         {L('Description facultative', 'Optional description')}
         <textarea

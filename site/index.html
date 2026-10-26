@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cyberfox — Vos tests mobiles. Les preuves en plus.</title>
+    <meta
+      name="description"
+      content="Explorez, créez et rejouez vos scénarios Android et iOS. IA assistée, captures et rapports réunis dans un atelier QA mobile open source."
+    />
+    <meta name="theme-color" content="#111016" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Cyberfox — Vos tests mobiles. Les preuves en plus." />
+    <meta
+      property="og:description"
+      content="L’atelier QA mobile pour Android et iOS. Explorez avec l’IA, vérifiez sur vos appareils, partagez les résultats."
+    />
+    <meta property="og:url" content="https://pickywawa.github.io/cyberfox/" />
+    <meta
+      property="og:image"
+      content="https://pickywawa.github.io/cyberfox/assets/screenshots/campaign.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href="https://pickywawa.github.io/cyberfox/" />
+    <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main" data-fr="Aller au contenu" data-en="Skip to content"
+      >Aller au contenu</a
+    >
+    <header class="header wrap">
+      <a class="brand" href="#" aria-label="Cyberfox"
+        ><img src="assets/icon.svg" alt="" width="32" height="32" />cyberfox<span class="version"
+          >0.4.0</span
+        ></a
+      >
+      <nav aria-label="Navigation">
+        <a href="#workflow" data-fr="L’atelier" data-en="The workspace">L’atelier</a
+        ><a href="#inside" data-fr="En images" data-en="In pictures">En images</a
+        ><a href="#faq">FAQ</a
+        ><a href="https://github.com/pickywawa/cyberfox" rel="noopener">GitHub ↗</a>
+      </nav>
+      <div class="nav-actions">
+        <button id="language" type="button" aria-label="Switch to English">EN</button
+        ><a class="button small" href="#download" data-fr="Télécharger ↓" data-en="Download ↓"
+          >Télécharger ↓</a
+        >
+      </div>
+    </header>
+    <main id="main">
+      <section class="hero wrap">
+        <div class="hero-copy">
+          <p class="eyebrow">
+            <span class="signal"></span
+            ><span
+              data-fr="L’ATELIER QA MOBILE · OPEN SOURCE"
+              data-en="THE MOBILE QA WORKSPACE · OPEN SOURCE"
+              >L’ATELIER QA MOBILE · OPEN SOURCE</span
+            >
+          </p>
+          <h1>
+            <span data-fr="Vos tests mobiles." data-en="Your mobile tests.">Vos tests mobiles.</span
+            ><br /><em data-fr="Les preuves en plus." data-en="With proof built in."
+              >Les preuves en plus.</em
+            >
+          </h1>
+          <p
+            class="intro"
+            data-fr="De la première exploration au dernier test. Créez vos scénarios Android et iOS avec l’IA, rejouez-les sur vos appareils et retrouvez chaque résultat en image."
+            data-en="From the first exploration to the last check. Create Android and iOS scenarios with AI, replay them on your devices and see the evidence behind every result."
+          >
+            De la première exploration au dernier test. Créez vos scénarios Android et iOS avec
+            l’IA, rejouez-les sur vos appareils et retrouvez chaque résultat en image.
+          </p>
+          <div class="hero-actions">
+            <a
+              class="button"
+              href="#download"
+              data-fr="Ouvrir votre nouvel atelier ↗"
+              data-en="Meet your new workspace ↗"
+              >Ouvrir votre nouvel atelier ↗</a
+            ><a
+              class="text-link"
+              href="#inside"
+              data-fr="Voir Cyberfox en action ↓"
+              data-en="See Cyberfox in action ↓"
+              >Voir Cyberfox en action ↓</a
+            >
+          </div>
+          <p
+            class="fine"
+            data-fr="Application de bureau · MIT · Français / English"
+            data-en="Desktop application · MIT · Français / English"
+          >
+            Application de bureau · MIT · Français / English
+          </p>
+        </div>
+        <div class="hero-index" aria-hidden="true">
+          <img src="assets/icon.svg" width="104" height="104" alt="" />
+          <div><span>01</span><b>EXPLORE</b></div>
+          <div><span>02</span><b>VERIFY</b></div>
+          <div><span>03</span><b>REPLAY</b></div>
+          <p>OBSERVED.<br />TESTED.<br /><i>CAPTURED.</i></p>
+        </div>
+        <figure class="app-frame hero-frame">
+          <div class="window-bar">
+            <span class="traffic"><i></i><i></i><i></i></span><span>cyberfox / atlas-mobile</span
+            ><span class="demo-tag" data-fr="DÉMONSTRATION" data-en="DEMO WORKSPACE"
+              >DÉMONSTRATION</span
+            >
+          </div>
+          <button
+            class="screenshot-open"
+            data-image="assets/screenshots/campaign.png"
+            aria-label="Agrandir la capture / Enlarge screenshot"
+          >
+            <img
+              src="assets/screenshots/campaign.png"
+              width="1600"
+              height="1000"
+              alt="Cyberfox : progression de campagne et captures Android et iOS côte à côte"
+              fetchpriority="high"
+            />
+          </button>
+          <figcaption>
+            <span
+              data-fr="Chaque étape a son résultat. Chaque résultat, sa capture."
+              data-en="A result for every step. Evidence for every result."
+              >Chaque étape a son résultat. Chaque résultat, sa capture.</span
+            ><span>01 / CAMPAIGN</span>
+          </figcaption>
+        </figure>
+        <div class="platform-strip">
+          <span>Android + iOS</span><span>Flutter</span><span>Codex / GitHub Copilot</span
+          ><span>Appium</span
+          ><span data-fr="Projets locaux" data-en="Local projects">Projets locaux</span>
+        </div>
+      </section>
+      <section class="wrap section" id="workflow">
+        <div class="section-title">
+          <p class="eyebrow">01 / WORKFLOW</p>
+          <h2>
+            <span data-fr="Une intention." data-en="One intent.">Une intention.</span><br /><em
+              data-fr="Deux plateformes."
+              data-en="Two platforms."
+              >Deux plateformes.</em
+            >
+          </h2>
+          <p
+            data-fr="Un scénario partagé, des sélecteurs propres à chaque OS. Vous gardez le contrôle de ce qui est créé, exécuté et vérifié."
+            data-en="A shared scenario, platform-specific selectors. You stay in control of what gets created, executed and verified."
+          >
+            Un scénario partagé, des sélecteurs propres à chaque OS. Vous gardez le contrôle de ce
+            qui est créé, exécuté et vérifié.
+          </p>
+        </div>
+        <div class="workflow-grid">
+          <article>
+            <span class="step-number">01 — EXPLORE</span>
+            <h3 data-fr="Partez d’un vrai écran." data-en="Start with a real screen.">
+              Partez d’un vrai écran.
+            </h3>
+            <p
+              data-fr="Inspectez l’arbre d’accessibilité, sélectionnez un composant et associez-le à votre scénario. Les interactions ciblent les éléments, pas des coordonnées fragiles."
+              data-en="Inspect the accessibility tree, select a component and bind it to your scenario. Interactions target elements instead of fragile screen coordinates."
+            >
+              Inspectez l’arbre d’accessibilité, sélectionnez un composant et associez-le à votre
+              scénario. Les interactions ciblent les éléments, pas des coordonnées fragiles.
+            </p>
+          </article>
+          <article>
+            <span class="step-number">02 — CREATE</span>
+            <h3 data-fr="Décrivez le parcours." data-en="Describe the journey.">
+              Décrivez le parcours.
+            </h3>
+            <p
+              data-fr="Codex ou Copilot explore les appareils connectés et propose un scénario à valider. Mode interactif ou Auto-approve pour les questions et la création de variables fournies."
+              data-en="Codex or Copilot explores connected devices and proposes a scenario for review. Choose Interactive or Auto-approve for clarification and supplied variable creation."
+            >
+              Codex ou Copilot explore les appareils connectés et propose un scénario à valider.
+              Mode interactif ou Auto-approve pour les questions et la création de variables
+              fournies.
+            </p>
+          </article>
+          <article>
+            <span class="step-number">03 — VERIFY</span>
+            <h3 data-fr="Vérifiez, puis partagez." data-en="Verify. Then share.">
+              Vérifiez, puis partagez.
+            </h3>
+            <p
+              data-fr="Lancez une campagne, examinez les étapes et revoyez les captures. Exportez les résultats en texte, CSV, Markdown ou Confluence."
+              data-en="Run a campaign, inspect each step and replay its screenshots. Export results as text, CSV, Markdown or Confluence."
+            >
+              Lancez une campagne, examinez les étapes et revoyez les captures. Exportez les
+              résultats en texte, CSV, Markdown ou Confluence.
+            </p>
+          </article>
+        </div>
+      </section>
+      <section class="section gallery-section" id="inside">
+        <div class="wrap">
+          <div class="section-title">
+            <p class="eyebrow">02 / INSIDE CYBERFOX</p>
+            <h2
+              data-fr="Le contexte.\nToujours à portée de vue."
+              data-en="The context.\nAlways in view."
+            >
+              Le contexte.<br />Toujours à portée de vue.
+            </h2>
+            <p
+              data-fr="Vos scénarios à gauche, votre travail au centre, les appareils à droite. Un espace redimensionnable pour rester concentré sur le parcours."
+              data-en="Scenarios on the left, your work in the center, devices on the right. A resizable workspace that keeps the journey in focus."
+            >
+              Vos scénarios à gauche, votre travail au centre, les appareils à droite. Un espace
+              redimensionnable pour rester concentré sur le parcours.
+            </p>
+          </div>
+          <div class="gallery-tabs" role="tablist" aria-label="Captures / Screenshots">
+            <button
+              role="tab"
+              id="gallery-campaign"
+              aria-controls="gallery-panel"
+              aria-selected="true"
+              data-shot="campaign"
+              data-fr="Campagnes"
+              data-en="Campaigns"
+            >
+              Campagnes</button
+            ><button
+              role="tab"
+              id="gallery-screen-map"
+              aria-controls="gallery-panel"
+              aria-selected="false"
+              data-shot="screen-map"
+              data-fr="Cartographie"
+              data-en="Screen map"
+            >
+              Cartographie</button
+            ><button
+              role="tab"
+              id="gallery-workspace"
+              aria-controls="gallery-panel"
+              aria-selected="false"
+              data-shot="workspace"
+              data-fr="Création"
+              data-en="Creation"
+            >
+              Création
+            </button>
+          </div>
+          <figure
+            class="app-frame"
+            id="gallery-panel"
+            role="tabpanel"
+            aria-labelledby="gallery-campaign"
+          >
+            <button
+              class="screenshot-open"
+              id="gallery-open"
+              data-image="assets/screenshots/campaign.png"
+              aria-label="Agrandir la capture / Enlarge screenshot"
+            >
+              <img
+                id="gallery-image"
+                src="assets/screenshots/campaign.png"
+                width="1600"
+                height="1000"
+                alt="Cyberfox : suivi des tests et captures par plateforme"
+                loading="lazy"
+              />
+            </button>
+            <figcaption>
+              <span
+                id="gallery-caption"
+                data-fr="Un tableau compact. Un clic pour retrouver la capture d’une étape."
+                data-en="A compact table. One click to replay a step’s screenshot."
+                >Un tableau compact. Un clic pour retrouver la capture d’une étape.</span
+              ><span>↗ FULL SIZE</span>
+            </figcaption>
+          </figure>
+          <p
+            class="demo-note"
+            data-fr="Captures réelles de l’aperçu Cyberfox, avec une application fictive et des résultats de démonstration. Aucun compte ni contenu métier réel."
+            data-en="Actual Cyberfox preview screenshots with a fictional app and demonstration results. No real accounts or business data."
+          >
+            Captures réelles de l’aperçu Cyberfox, avec une application fictive et des résultats de
+            démonstration. Aucun compte ni contenu métier réel.
+          </p>
+        </div>
+      </section>
+      <section class="wrap section detail-grid">
+        <div>
+          <p class="eyebrow">03 / BUILT FOR QA</p>
+          <h2>
+            <span data-fr="Pas seulement" data-en="More than">Pas seulement</span><br /><em
+              data-fr="un test au vert."
+              data-en="a green check."
+              >un test au vert.</em
+            >
+          </h2>
+          <p
+            class="intro"
+            data-fr="Un clic réussi n’est pas une assertion réussie. Cyberfox distingue ce qui a été observé, ce qui a été exécuté et ce qui a réellement été vérifié."
+            data-en="A successful tap is not a successful assertion. Cyberfox separates what was observed, what was executed and what was actually verified."
+          >
+            Un clic réussi n’est pas une assertion réussie. Cyberfox distingue ce qui a été observé,
+            ce qui a été exécuté et ce qui a réellement été vérifié.
+          </p>
+        </div>
+        <div class="feature-list">
+          <article>
+            <span>↳</span>
+            <div>
+              <h3
+                data-fr="Des campagnes, pas des traces perdues."
+                data-en="Campaigns, not scattered logs."
+              >
+                Des campagnes, pas des traces perdues.
+              </h3>
+              <p
+                data-fr="Historique persistant, étapes bloquantes, préconditions et résultats séparés par OS."
+                data-en="Persistent history, blocking steps, preconditions and separate results per OS."
+              >
+                Historique persistant, étapes bloquantes, préconditions et résultats séparés par OS.
+              </p>
+            </div>
+          </article>
+          <article>
+            <span>◇</span>
+            <div>
+              <h3 data-fr="Une carte des écrans testés." data-en="A map of tested screens.">
+                Une carte des écrans testés.
+              </h3>
+              <p
+                data-fr="Captures, liens observés et compteurs par plateforme. Les détails s’ouvrent sans perdre la vue d’ensemble."
+                data-en="Screenshots, observed transitions and platform counters. Open details without losing the overview."
+              >
+                Captures, liens observés et compteurs par plateforme. Les détails s’ouvrent sans
+                perdre la vue d’ensemble.
+              </p>
+            </div>
+          </article>
+          <article>
+            <span>⌘</span>
+            <div>
+              <h3 data-fr="Votre projet reste chez vous." data-en="Your project stays with you.">
+                Votre projet reste chez vous.
+              </h3>
+              <p
+                data-fr="Scénarios, variables et résultats sont enregistrés localement. L’IA utilise votre compte fournisseur et lui transmet le contexte nécessaire à l’exploration."
+                data-en="Scenarios, variables and results are stored locally. AI uses your provider account and sends it the context needed for exploration."
+              >
+                Scénarios, variables et résultats sont enregistrés localement. L’IA utilise votre
+                compte fournisseur et lui transmet le contexte nécessaire à l’exploration.
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section class="wrap section download-section" id="download">
+        <p class="eyebrow">04 / GET CYBERFOX</p>
+        <div class="download-layout">
+          <div>
+            <h2 data-fr="Votre prochain test\ncommence ici." data-en="Your next test\nstarts here.">
+              Votre prochain test<br />commence ici.
+            </h2>
+            <p
+              data-fr="Gratuit, open source, sans compte Cyberfox. Connectez vos appareils et votre fournisseur IA si vous souhaitez la création assistée."
+              data-en="Free, open source, no Cyberfox account. Connect your devices and your AI provider if you want assisted creation."
+            >
+              Gratuit, open source, sans compte Cyberfox. Connectez vos appareils et votre
+              fournisseur IA si vous souhaitez la création assistée.
+            </p>
+            <a
+              class="text-link"
+              href="https://github.com/pickywawa/cyberfox/releases/tag/v0.4.0"
+              data-fr="Lire les nouveautés de la 0.4.0 ↗"
+              data-en="Read what’s new in 0.4.0 ↗"
+              >Lire les nouveautés de la 0.4.0 ↗</a
+            >
+          </div>
+          <div class="download-card">
+            <span class="release-label">RELEASE 0.4.0</span>
+            <h3>macOS · Apple Silicon</h3>
+            <p
+              data-fr="Mac M1 et suivants · Installateur DMG"
+              data-en="M1 Macs and newer · DMG installer"
+            >
+              Mac M1 et suivants · Installateur DMG
+            </p>
+            <a
+              class="button download-link"
+              href="https://github.com/pickywawa/cyberfox/releases/download/v0.4.0/Cyberfox-0.4.0-mac-arm64.dmg"
+              data-fr="Télécharger Cyberfox ↓"
+              data-en="Download Cyberfox ↓"
+              >Télécharger Cyberfox ↓</a
+            >
+            <p
+              class="install-note"
+              data-fr="Signature locale ad hoc, sans notarisation Apple. macOS peut demander une autorisation dans Réglages Système → Confidentialité et sécurité."
+              data-en="Locally ad-hoc signed, without Apple notarization. macOS may require approval in System Settings → Privacy & Security."
+            >
+              Signature locale ad hoc, sans notarisation Apple. macOS peut demander une autorisation
+              dans Réglages Système → Confidentialité et sécurité.
+            </p>
+            <a
+              href="https://github.com/pickywawa/cyberfox#development"
+              class="source-link"
+              data-fr="Windows, Linux ou Intel ? Développer depuis les sources ↗"
+              data-en="Windows, Linux or Intel? Build from source ↗"
+              >Windows, Linux ou Intel ? Développer depuis les sources ↗</a
+            >
+          </div>
+        </div>
+      </section>
+      <section class="wrap section faq-section" id="faq">
+        <div class="section-title">
+          <p class="eyebrow">05 / GOOD TO KNOW</p>
+          <h2 data-fr="Avant le premier test." data-en="Before the first test.">
+            Avant le premier test.
+          </h2>
+        </div>
+        <div class="faq-list">
+          <details>
+            <summary
+              data-fr="Que faut-il pour tester sur Android et iOS ?"
+              data-en="What do Android and iOS testing require?"
+            >
+              Que faut-il pour tester sur Android et iOS ?
+            </summary>
+            <p
+              data-fr="Android : SDK Platform Tools, JDK, débogage USB et appareil autorisé. iOS : sur Mac, Xcode et WebDriverAgent ; un iPhone physique nécessite une signature du runner. Les simulateurs doivent être démarrés. Le diagnostic intégré guide la configuration."
+              data-en="Android: SDK Platform Tools, a JDK, USB debugging and an authorized device. iOS: on Mac, Xcode and WebDriverAgent; a physical iPhone requires runner signing. Simulators must be booted. Built-in diagnostics help with setup."
+            >
+              Android : SDK Platform Tools, JDK, débogage USB et appareil autorisé. iOS : sur Mac,
+              Xcode et WebDriverAgent ; un iPhone physique nécessite une signature du runner. Les
+              simulateurs doivent être démarrés. Le diagnostic intégré guide la configuration.
+            </p>
+          </details>
+          <details>
+            <summary
+              data-fr="Est-ce compatible avec Flutter ?"
+              data-en="Does it work with Flutter?"
+            >
+              Est-ce compatible avec Flutter ?
+            </summary>
+            <p
+              data-fr="Oui, via les composants accessibles exposés à Appium sur Android et iOS. La stabilité du scénario dépend de l’accessibilité et des identifiants fournis par l’application. Cyberfox gère notamment les changements de champ au focus observés sur iOS."
+              data-en="Yes, through accessible components exposed to Appium on Android and iOS. Scenario stability depends on the app’s accessibility and identifiers. Cyberfox handles input replacement on focus observed on iOS."
+            >
+              Oui, via les composants accessibles exposés à Appium sur Android et iOS. La stabilité
+              du scénario dépend de l’accessibilité et des identifiants fournis par l’application.
+              Cyberfox gère notamment les changements de champ au focus observés sur iOS.
+            </p>
+          </details>
+          <details>
+            <summary data-fr="L’IA est-elle obligatoire ?" data-en="Is AI required?">
+              L’IA est-elle obligatoire ?
+            </summary>
+            <p
+              data-fr="Non. Vous pouvez créer et exécuter vos scénarios manuellement. L’exploration assistée nécessite votre authentification Codex ou GitHub Copilot ; les limites et conditions du fournisseur s’appliquent. Auto-approve ne remplace pas la validation finale de la proposition."
+              data-en="No. You can create and run scenarios manually. Assisted exploration requires your Codex or GitHub Copilot authentication; provider limits and terms apply. Auto-approve does not replace final proposal review."
+            >
+              Non. Vous pouvez créer et exécuter vos scénarios manuellement. L’exploration assistée
+              nécessite votre authentification Codex ou GitHub Copilot ; les limites et conditions
+              du fournisseur s’appliquent. Auto-approve ne remplace pas la validation finale de la
+              proposition.
+            </p>
+          </details>
+          <details>
+            <summary data-fr="Quelles données sont partagées ?" data-en="What data gets shared?">
+              Quelles données sont partagées ?
+            </summary>
+            <p
+              data-fr="Le projet et les captures sont enregistrés sur votre machine. Une exploration ou une analyse IA transmet le contexte concerné au fournisseur choisi. Ce site ne contient ni traceur publicitaire ni mesure d’audience."
+              data-en="Projects and screenshots are saved on your machine. AI exploration or analysis sends the relevant context to your selected provider. This website has no advertising trackers or analytics."
+            >
+              Le projet et les captures sont enregistrés sur votre machine. Une exploration ou une
+              analyse IA transmet le contexte concerné au fournisseur choisi. Ce site ne contient ni
+              traceur publicitaire ni mesure d’audience.
+            </p>
+          </details>
+        </div>
+      </section>
+    </main>
+    <footer class="wrap footer">
+      <a class="brand" href="#"
+        ><img src="assets/icon.svg" width="26" height="26" alt="" />cyberfox</a
+      ><span data-fr="Des tests. Du contexte. Des preuves." data-en="Tests. Context. Evidence."
+        >Des tests. Du contexte. Des preuves.</span
+      >
+      <div>
+        <a href="https://github.com/pickywawa/cyberfox">GitHub ↗</a
+        ><a
+          href="https://github.com/pickywawa/cyberfox/issues"
+          data-fr="Signaler un problème"
+          data-en="Report an issue"
+          >Signaler un problème</a
+        ><a href="https://github.com/pickywawa/cyberfox/blob/main/LICENSE">MIT</a
+        ><a href="https://pickywawa.github.io/cyberdog/">Cyberdog ↗</a>
+      </div>
+    </footer>
+    <dialog id="lightbox" aria-label="Capture Cyberfox / Cyberfox screenshot">
+      <button id="lightbox-close" autofocus aria-label="Fermer / Close">×</button
+      ><img id="lightbox-image" alt="" />
+      <p
+        data-fr="Échap pour fermer · données de démonstration"
+        data-en="Escape to close · demonstration data"
+      >
+        Échap pour fermer · données de démonstration
+      </p>
+    </dialog>
+  </body>
+</html>

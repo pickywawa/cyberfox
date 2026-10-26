@@ -1,117 +1,121 @@
-# Cyberfox
+<div align="center">
+  <img src="site/assets/icon.svg" width="88" alt="Cyberfox logo">
+  <h1>Cyberfox</h1>
+  <p><strong>Your mobile tests. With proof built in.</strong></p>
+  <p>An open-source desktop workspace to explore, create and replay Android & iOS test scenarios.</p>
+  <p><a href="README.fr.md">Français</a> · <strong>English</strong></p>
+  <p>
+    <a href="https://pickywawa.github.io/cyberfox/">Website</a> ·
+    <a href="https://github.com/pickywawa/cyberfox/releases/latest">Download</a> ·
+    <a href="https://github.com/pickywawa/cyberfox/blob/main/CHANGELOG.md">What’s new</a> ·
+    <a href="https://github.com/pickywawa/cyberfox/issues">Report an issue</a>
+  </p>
+  <p>
+    <a href="https://github.com/pickywawa/cyberfox/releases/latest"><img src="https://img.shields.io/github/v/release/pickywawa/cyberfox?style=flat-square&color=bfa0fa" alt="Latest release"></a>
+    <a href="https://github.com/pickywawa/cyberfox/actions/workflows/ci.yml"><img src="https://github.com/pickywawa/cyberfox/actions/workflows/ci.yml/badge.svg" alt="Build and tests"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-cbef9c?style=flat-square" alt="MIT license"></a>
+  </p>
+</div>
 
-Atelier QA mobile Electron, React et TypeScript : exploration par composants, scénarios Android/iOS, génération exploratoire Codex/Copilot et rapport de rejeu en direct. Thèmes et style inspirés de Cyberdog ; français et anglais.
+![Cyberfox campaign progress with Android and iOS screenshots](site/assets/screenshots/campaign.png)
 
-## Installation et mises à jour
+_Actual Cyberfox browser-preview screenshots. Atlas Mobile is a fictional app; all displayed results and mobile screens are demonstration data._
 
-Télécharger le DMG **macOS Apple Silicon (arm64)** depuis les [releases GitHub](https://github.com/pickywawa/cyberfox/releases/latest), puis glisser Cyberfox dans Applications. La version 0.3.1 utilise une signature locale ad hoc valide, mais n’a pas de signature Developer ID ni de notarisation Apple. Gatekeeper ne l’accepte donc pas automatiquement. Après une première tentative d’ouverture, une autorisation manuelle peut être proposée dans Réglages Système → Confidentialité et sécurité → Ouvrir quand même. Une distribution reconnue sans cette intervention exige un certificat Developer ID Application et une notarisation Apple. Les autres architectures n’ont pas encore d’installateur publié.
+## One journey. Two platforms. Evidence at every step.
 
-À partir de la version 0.3.0, Cyberfox vérifie les releases stables au démarrage puis toutes les quatre heures. Une nouvelle version affiche le bouton **Nouveau**. Paramètres → **Mises à jour** permet de vérifier manuellement, lire les notes, télécharger avec une barre de progression et activer le téléchargement automatique. Les réglages utilisent le bouton Enregistrer habituel.
+Cyberfox brings the scenario tree, test results and devices into one resizable workspace. Build scenarios manually or let Codex / GitHub Copilot explore connected devices and propose additions for your review. Run campaigns, revisit screenshots and share the results.
 
-Le téléchargement ne ferme jamais l’application. **Installer la mise à jour** demande confirmation avant d’ouvrir le DMG puis fermer Cyberfox ; l’utilisateur remplace ensuite l’application dans Applications. Une exécution de tests active doit être arrêtée au préalable. Les projets et réglages restent dans leurs emplacements habituels. Un fichier déjà téléchargé est retrouvé au prochain contrôle après redémarrage.
+| Explore                                                     | Create                                                   | Verify                                               |
+| ----------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------- |
+| Inspect accessible UI components on Android and iOS.        | Describe a journey or bind components to steps yourself. | Run scenarios and check observable outcomes.         |
+| Interactions use element selectors, not screen coordinates. | Shared intent, separate operations and selectors per OS. | A successful tap is not treated as proof of success. |
 
-La pile réseau Chromium utilise le proxy système et PAC, y compris derrière un VPN, avec rechargement du proxy après une erreur de connexion. Si le VPN ou le pare-feu interdit GitHub, il doit autoriser GitHub et ses hôtes de téléchargement. Les vérifications TLS restent actives. L’installateur est contrôlé par taille et SHA-256 fourni par GitHub avant installation ; aucun fichier incompatible ou sans empreinte n’est exécuté.
+## Inside the workspace
 
-Pour produire la prochaine release : incrémenter la version, lancer `npm ci`, `npm run dist -- --mac dmg --arm64`, puis publier le tag et le DMG sur ce dépôt public. Conserver le nom généré `Cyberfox-<version>-mac-arm64.dmg` : le moteur choisit l’installateur selon l’OS et l’architecture. Les préversions sont exclues des mises à jour automatiques.
+### Campaigns that keep the context
 
-### Icône, taille et signature du paquet macOS
+- Persistent campaign history and per-platform results.
+- Compact progress table with search, status filters and a completion ring.
+- Select a step to display its screenshot in the device panel.
+- Expand step details without opening a screenshot inside the table.
+- Export the whole campaign as **text, CSV, Markdown or Confluence wiki markup**.
+- When rerunning all tests, choose whether to retain results or clear the current campaign and restart the app. Restarting preserves app data.
 
-L’icône source est `public/cyberfox.svg` ; `npm run icons` régénère `build/icon.png` et `build/icon.icns`. Le paquet utilise cette icône pour Finder et le Dock, y compris au lancement de la version de développement.
+### A map of what you tested
 
-Les bibliothèques React et les icônes Lucide sont uniquement des dépendances de développement : Vite les compile dans le frontend. Copilot partage un seul exécutable entre authentification et transport SDK, sans embarquer le second runtime natif optionnel du SDK. Codex et Appium restent inclus et les fonctions QA sont conservées. Le DMG passe de 494,7 à 420,8 Mo ; les fichiers de l’application passent de 1 115,1 à 918,7 Mo.
+![Tested screens, screenshots and per-platform counters](site/assets/screenshots/screen-map.png)
 
-`mac.identity` vaut `-` pour activer une signature ad hoc, et non `null` qui désactive la signature et laissait en 0.3.0 un sceau Electron invalide. Le hook `afterSign` vérifie la signature profonde et stricte, l’icône et l’absence du second runtime Copilot avant de créer le DMG. `npm run test:package:mac` répète ces contrôles sur le paquet construit. Ce contrôle d’intégrité ne remplace pas l’approbation Gatekeeper : celle-ci exige la signature Developer ID et la notarisation.
+Only screens associated with executed tests appear. View available captures, observed paths and small Android/iOS counters. Click a screen to open its test details in a contextual popup.
 
-## Développement
+### Assisted creation, with review built in
 
-Node.js 22.12+ et npm :
+![Cyberfox scenario editor and workspace](site/assets/screenshots/workspace.png)
+
+- **Codex or GitHub Copilot**, with model and reasoning-effort selection.
+- **Interactive / Auto-approve** exploration modes. Auto-approve handles clarification and supplied-variable creation without popups; it does not bypass final proposal review.
+- Project variables referenced as `${VARIABLE_NAME}` in scenarios.
+- Newly supplied credentials can be saved during exploration and used immediately.
+- Validation against observed selectors and successfully executed interactions; bounded correction of incomplete proposals.
+- Optional replay before acceptance, distinct screen identities, preconditions and blocking steps.
+- Local exploration traces and per-OS coverage gaps when a device is unavailable.
+
+## Download
+
+**[Download Cyberfox 0.4.0 for macOS Apple Silicon](https://github.com/pickywawa/cyberfox/releases/download/v0.4.0/Cyberfox-0.4.0-mac-arm64.dmg)**
+
+Open the DMG, then drag **Cyberfox** into **Applications**. See the [release notes](https://github.com/pickywawa/cyberfox/releases/tag/v0.4.0) for checksums and details.
+
+The macOS app is locally ad-hoc signed, without Apple Developer ID signing or notarization. macOS may require approval in **System Settings → Privacy & Security → Open Anyway** after an initial launch attempt. Projects and settings remain in their existing locations when upgrading.
+
+Only the macOS Apple Silicon installer is published for this release. Windows, Linux and Intel development builds can be produced from source; they are not downloadable installers in this release. Built-in updates detect later stable GitHub releases and let you download their installer.
+
+## Device setup
+
+| Target  | Requirements                                                                                                                                                           |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Android | Android SDK Platform Tools, a JDK, USB debugging and an authorized device; booted emulators can also be selected.                                                      |
+| iOS     | Standard setup: macOS, Xcode and WebDriverAgent. Physical iPhones require trust, Developer Mode and signing for the WDA runner. Boot simulators before selecting them. |
+| Flutter | Accessible controls exposed to Appium. Flutter projects target both Android and iOS; each platform keeps its own selectors.                                            |
+
+Appium, UiAutomator2 and XCUITest are bundled. A detected device does not automatically mean automation is ready: the device-panel diagnostics distinguish connection, signing, WDA and mirror status. Accessibility quality and stable application identifiers still matter.
+
+## Data and AI
+
+Projects, variables, captures and campaign results are stored on your machine. AI exploration and analysis send the relevant request and UI context to the selected provider using your authenticated account. Provider usage limits and terms apply; no Cyberfox account is required.
+
+Scenarios store variable placeholders instead of credential literals. Project variables are local project data, **not an encrypted password vault**. Keep project folders and exported artifacts private when they contain sensitive data. This repository and its screenshots contain demonstration data only.
+
+## Development
+
+Node.js **22.12+** and npm:
 
 ```sh
+git clone https://github.com/pickywawa/cyberfox.git
+cd cyberfox
 npm ci
 npm run dev
 ```
 
-`npm run build && npm start` lance la version compilée. L’aperçu navigateur (`npm run dev:web`, http://127.0.0.1:5173) possède un stockage local distinct et ne prétend pas contrôler des appareils ou appeler l’IA. Redémarrer Electron après une modification du backend ; Vite recharge l’interface à chaud.
+| Command                             | Purpose                                                                                  |
+| ----------------------------------- | ---------------------------------------------------------------------------------------- |
+| `npm run dev`                       | Vite + TypeScript watch + Electron with automatic backend restart.                       |
+| `npm run dev:web`                   | Browser preview with separate local storage; no device control or real AI.               |
+| `npm run build`                     | Type-check and build the application.                                                    |
+| `npm test`                          | Unit, protocol and persistence tests.                                                    |
+| `npm run test:e2e`                  | Playwright browser tests; install Chromium first with `npx playwright install chromium`. |
+| `npm run test:electron`             | Desktop smoke tests in an isolated profile.                                              |
+| `npm run dist -- --mac dmg --arm64` | Build the Apple Silicon installer on macOS.                                              |
+| `npm run test:package:mac`          | Check packaged app integrity, signature and icons.                                       |
+| `npm run test:package:appium`       | Load bundled drivers and start the packaged Appium server.                               |
 
-## Organisation
+Use `CYBERFOX_USER_DATA=/absolute/path/to/dev-profile npm run dev` for an isolated desktop profile. The browser preview uses its own storage. The [static website](site/) deploys to GitHub Pages using [its workflow](.github/workflows/pages.yml).
 
-- Un seul projet courant, un dossier par projet ; emplacement réglable dans Paramètres → Projets.
-- Scénarios **uniquement à la racine** ; enfants de type action, navigation ou test.
-- `+` ajoute immédiatement un élément, configuré dans le panneau central : nom, description, tags du projet, précondition, comportement des enfants et échec bloquant.
-- Les préconditions référencent le **test immédiatement précédent**. Le moteur le vérifie à nouveau avant l’élément. Si la précondition est fausse, l’élément est ignoré ; ses enfants ne sont exécutés que si l’option correspondante est activée.
-- Une intention commune avec des variantes et sélecteurs distincts par OS. Flutter implique **Android et iOS**, même si une seule autre case est cochée.
-- Les tags ajoutés depuis l’éditeur restent disponibles dans tout le projet.
-- Onglets Création/Exécution dans la barre supérieure, choix conservé par projet.
-- Panneaux gauche/droit et chat redimensionnables, dimensions conservées.
+Additional documentation (French): [creation assistance](docs/creation-assistance.md), [test campaigns](docs/test-campaigns.md), [technical reference](docs/development.md).
 
-Le fichier `cyberfox.project.json` conserve arbre, tags, appareils, sélection, échanges et révision. Les anciens arbres sont migrés en préservant noms, descriptions et identifiants. Les propositions refusées ne modifient jamais l’arbre.
+## Contributing
 
-## Appareils et composants
+Bug reports should include the Cyberfox version, host OS, target OS, relevant step and a sanitized error or trace. Avoid posting credentials, personal information or real business screenshots. See [open issues](https://github.com/pickywawa/cyberfox/issues).
 
-Le sélecteur se rafraîchit à chaque ouverture. Les appareils USB sont visibles immédiatement ; simulateurs/émulateurs sont dans un groupe repliable. Un projet avec un seul OS a une vue mobile ; Android+iOS ou Flutter en a deux. Elles passent côte à côte lorsque leur panneau dépasse 620 px. La fenêtre Appareils peut être externalisée et se restaure au redémarrage.
+Built with Electron, React, TypeScript, Appium, Codex and GitHub Copilot integrations. Part of the same family as [Cyberdog](https://pickywawa.github.io/cyberdog/).
 
-Le miroir utilise des captures PNG périodiques et reste distinct du moteur d’automatisation. « Explorer » interroge l’arbre d’accessibilité via Appium. Cliquer sur l’image sélectionne un **composant du dernier arbre inspecté** : on peut l’associer à l’élément courant ou l’activer. Le bouton de sélection bascule vers un mode d’interaction directe, qui résout également le composant avant d’agir. Aucun clic exécuté ni scénario enregistré n’utilise des coordonnées. Les rectangles ne servent qu’à sélectionner un composant dans le miroir et à afficher le pointeur rouge.
-
-Les sélecteurs ambigus sont refusés. Les assertions attendent une condition (visible, absent, texte exact, activé) dans le délai configuré. La présence d’un appareil ne suffit pas : un avertissement signale les OS sans appareil associé **et inspectable**.
-
-### Android
-
-Installer Android SDK Platform Tools et un JDK, activer le débogage USB et autoriser l’ordinateur. Le logiciel recherche ADB dans les emplacements SDK usuels et détecte le JDK macOS. `ANDROID_HOME` et `JAVA_HOME` peuvent être fournis explicitement.
-
-### iOS
-
-Mac, Xcode, confiance de l’iPhone et mode développeur. La détection utilise `xcrun devicectl`, sans dépendance à libimobiledevice. Les simulateurs doivent être démarrés au préalable.
-
-Pour un iPhone physique : connecter le compte Apple dans Xcode → Settings → Accounts ; régler **Team ID** et **WebDriverAgent Bundle ID** dans Paramètres → Appareils. Xcode doit pouvoir signer et installer le test runner sur cet appareil. Un profil pour l’application métier ne remplace pas le profil du runner. Les erreurs de signature restent des blocages visibles ; aucun succès iOS n’est inventé.
-
-Appium et les pilotes UiAutomator2/XCUITest sont des dépendances npm. Le backend démarre un serveur local si aucun serveur n’écoute à l’adresse configurée. Il n’arrête que le serveur qu’il a lui-même lancé. Le tunnel WDA manuel reste une solution de secours pour le miroir ; il doit être explicitement associé au bon UDID.
-
-## Exécution
-
-Dans Exécution, `▶` sur un scénario le lance ; le bouton global lance toutes les racines. Un appareil par OS, deux OS en parallèle. Les étapes d’un même appareil restent séquentielles. Bleu : en cours ; vert : réussi ; rouge : échec ; gris : ignoré/bloqué/annulé.
-
-Le moteur exécute un **instantané** de l’arbre. Un échec non bloquant ne coupe pas la suite. Un échec bloquant bloque la suite de son scénario ; les autres scénarios restent indépendants. Un OS sans appareil donne un résultat bloqué, jamais un succès implicite.
-
-Le rapport est diffusé en direct et enregistré dans `reports/<run-id>.json`, avec les captures d’échec. Le dernier rapport est restauré à l’ouverture ; une exécution interrompue est marquée annulée. L’annulation est prise en compte entre les étapes et pendant les attentes ; le lancement initial d’une session native peut prendre plus longtemps.
-
-Paramètres → Exécution propose : analyse IA automatique, demande à l’utilisateur, ou aucune analyse. L’analyse utilise l’étape originale et ses traces ; elle ne réécrit aucun test. Les popups de demande sont mises en file et ne bloquent pas le moteur. Une analyse peut être déclenchée depuis une entrée du rapport.
-
-## Génération IA exploratoire
-
-Connecter Codex ou GitHub Copilot dans Paramètres → Intégration IA. Les CLI officielles incluses gèrent l’authentification et réutilisent les sessions locales. Les modèles Copilot viennent du compte ; Codex utilise son catalogue local si disponible, un identifiant explicite ou son modèle par défaut.
-
-Le moteur embarque ses consignes QA dans `electron/qa-instructions.ts` : protocole d’observation/action/réinspection, sélecteurs observés, cohérence inter-OS, préconditions, assertions, limites et analyse des régressions. Il envoie le **chemin courant complet en métadonnées**, l’arbre existant et les composants des appareils sélectionnés. L’IA peut naviguer pendant la génération ; ses décisions structurées sont exécutées uniquement par le backend sur des composants inspectés. Les outils système intégrés de Copilot sont désactivés ; Codex travaille dans un répertoire temporaire en lecture seule, sans recherche web.
-
-L’exploration est limitée à 40 étapes / 10 minutes et peut être arrêtée. Un appareil réservé par une exécution ne peut pas être piloté simultanément par l’IA ou une action manuelle. Les sélecteurs proposés sont comparés aux sélecteurs effectivement observés.
-
-La grande popup affiche l’arbre existant et les ajouts en bleu, avec détail à droite. Accepter ajoute les nœuds ; décliner garde l’arbre intact. Une révision empêche d’écraser silencieusement des modifications intervenues pendant la validation.
-
-Les observations et demandes sont envoyées au fournisseur choisi, selon ses conditions et les quotas du compte. Les champs signalés comme sécurisés par l’OS sont masqués dans les composants envoyés au modèle. Les variantes de saisie acceptent `${NOM}` ; le moteur lit alors `CYBERFOX_SECRET_NOM` dans son environnement. Ne versionnez pas les valeurs des comptes de test.
-
-Sources : [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk), [authentification Copilot](https://docs.github.com/en/copilot/how-tos/copilot-sdk/auth/authenticate), [UiAutomator2](https://appium.github.io/appium-uiautomator2-driver/latest/getting-started/).
-
-## Vérifications
-
-```sh
-npm run build
-npm test
-npx playwright install chromium
-npm run test:e2e
-npm run test:electron
-npm run test:updates
-```
-
-Les tests couvrent persistance, migration, contraintes de l’arbre, protocole WebDriver, attentes d’assertion, exécution parallèle, préconditions, échecs non bloquants et parcours d’édition/validation. Le test Electron utilise un dossier temporaire isolé.
-
-Vérifications facultatives sur matériel et compte IA (consomment les ressources du poste et, pour l’IA, le quota du fournisseur) :
-
-```sh
-npm run test:mobile
-npm run test:ai-live
-```
-
-Ces deux scripts sont dédiés à l’écran MFA de Pro SNP actuellement affiché sur un Android USB. Ils ne saisissent aucun identifiant et n’envoient aucun code. Le test IA vérifie que la proposition est fondée sur l’écran et qu’elle n’a pas été insérée sans accord.
-
-Validation réelle effectuée pendant le développement : connexion Android jusqu’au choix de réception du code MFA, inspection de 37 composants, assertion sur le titre MFA réussie, génération Codex d’un scénario et d’une assertion sans insertion automatique. L’essai iPhone est bloqué par Xcode (« No Accounts » et profil WDA absent). Le fonctionnement simultané Android+iOS est couvert avec des pilotes de test ; il reste à valider sur les deux appareils physiques une fois la signature iOS préparée.
-
-Les dépendances Appium apportent des avis `npm audit`, dont certains concernent des dépendances empaquetées dans les pilotes et ne sont pas corrigés par `npm audit fix`. Le serveur reste limité à l’interface locale. La signature Developer ID, la notarisation Apple et la validation complète du packaging Appium restent à préparer pour une distribution reconnue automatiquement par macOS.
+[MIT](LICENSE) · © 2026 pickywawa
