@@ -33,6 +33,12 @@ test('packaging restores sibling libvips beside a nested sharp addon before sign
     await mkdir(path.join(scope, 'sharp-darwin-arm64'), { recursive: true });
     await mkdir(source, { recursive: true });
     await writeFile(path.join(source, 'libvips.dylib'), 'demo-library');
+    await writeFile(path.join(source, '..', 'package.json'), JSON.stringify({ version: '1.3.4' }));
+    await writeFile(
+      path.join(scope, 'sharp-darwin-arm64', 'package.json'),
+      JSON.stringify({ optionalDependencies: { '@img/sharp-libvips-darwin-arm64': '1.3.4' } }),
+    );
+
     const context = {
       appOutDir,
       electronPlatformName: 'darwin',
@@ -44,6 +50,23 @@ test('packaging restores sibling libvips beside a nested sharp addon before sign
     await writeFile(target, 'existing-matching-library');
     await prepare(context);
     assert.equal(await readFile(target, 'utf8'), 'existing-matching-library');
+    const nestedSource = path.join(
+      projectDir,
+      'node_modules',
+      'driver',
+      'node_modules',
+      '@img',
+      'sharp-libvips-darwin-arm64',
+    );
+    await mkdir(path.join(nestedSource, 'lib'), { recursive: true });
+    await writeFile(path.join(nestedSource, 'package.json'), JSON.stringify({ version: '1.3.3' }));
+    await writeFile(path.join(nestedSource, 'lib', 'libvips.dylib'), 'matching-older-library');
+    await writeFile(
+      path.join(scope, 'sharp-darwin-arm64', 'package.json'),
+      JSON.stringify({ optionalDependencies: { '@img/sharp-libvips-darwin-arm64': '1.3.3' } }),
+    );
+    await prepare(context);
+    assert.equal(await readFile(target, 'utf8'), 'matching-older-library');
   } finally {
     await rm(temp, { recursive: true, force: true });
   }
